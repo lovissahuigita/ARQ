@@ -34,8 +34,8 @@ class rxpsocket:
     def __init__(self, udp_port, proxy_addr=('127.0.0.1', int(13000))):
         self.__state = States.OPEN
         self.__proxy_addr = proxy_addr
-        self.__self_addr = ('127.0.0.1', int)
-        self.__peer_addr = (str, int)
+        self.__self_addr = ('127.0.0.1', int(0))
+        self.__peer_addr = ('', int(0))
         self.__recv_buffer = None
         self.__send_buffer = None
         self.__init_seq_num = int(0)
@@ -99,7 +99,7 @@ class rxpsocket:
         pass
 
     # For internal use only
-    def _get_ip_addr(self):
+    def _get_addr(self):
         return self.__ip_addr
 
     # Process header for control related information
@@ -123,38 +123,45 @@ class rxpsocket:
     # use this after listen() is invoked
     def __process_passive_open(self, src_ip, rcvd_segment):
         client_queue = self.__connected_client_queue
-        if not client_queue.full():
-            if rcvd_segment.get_yo():
-                src_addr = (src_ip, rcvd_segment.get_src_port())
-                if rcvd_segment.get_ack() and src_addr is self.__peer_addr:
-                    # Received YO!+ACK segment
-                    if rcvd_segment.get_ack_num() == self.__init_seq_num + 1:
-                        # PASSIVE OPEN: YO_RCVD->ESTABLISHED
-                        self.__recv_buffer = RecvBuffer(
-                            base_seq_num=rcvd_segment.get_seq_num() + 1)
-                        self.__send_buffer = SendBuffer(
-                            base_seq_num=self.__init_seq_num + 1)
-                        self.__state = States.LISTEN
-                        # TODO: make new socket for the new client and enqueue
-                        # TODO: send ACK with data
-                    else:
-                        # failed to sync, peer send wrong ack number
-                        # TODO: Resend SYN_YO
-                        pass
+        if not client_queue.full() and rcvd_segment.get_yo():
+            src_addr = (src_ip, rcvd_segment.get_src_port())
+            if rcvd_segment.get_ack() and src_addr is self.__peer_addr:
+                # Received YO!+ACK segment
+                if rcvd_segment.get_ack_num() == self.__init_seq_num + 1:
+                    # PASSIVE OPEN: YO_RCVD->ESTABLISHED
+                    self.__recv_buffer = RecvBuffer(
+                        base_seq_num=rcvd_segment.get_seq_num() + 1)
+                    self.__send_buffer = SendBuffer(
+                        base_seq_num=self.__init_seq_num + 1)
+                    self.__state = States.LISTEN
+                    # TODO: make new socket for the new client and enqueue
+                    # TODO: send ACK with data
                 else:
-                    # Received YO! segment
-                    if self.__state is States.LISTEN:
-                        # PASSIVE OPEN: LISTEN->YO_RCVD
-                        self.__peer_addr = src_addr
-                        self.__init_seq_num = random.randint(0, 4294967296)
-                        self.__state = States.YO_RCVD
+                    # failed to sync, peer send wrong ack number
+                    # TODO: Resend SYN_YO
+                    pass
+            else:
+                # Received YO! segment
+                if self.__state is States.LISTEN:
+                    # PASSIVE OPEN: LISTEN->YO_RCVD
+                    self.__peer_addr = src_addr
+                    self.__init_seq_num = random.randint(0, 4294967296)
+                    self.__state = States.YO_RCVD
 
-                    # Need to check since this might be duplicate Yo! which in
-                    # that case this will be a resend
-                    if self.__state is States.YO_RCVD and src_addr is \
-                            self.__peer_addr:
-                        # TODO: send SYN_YO
-                        pass
+                # Need to check since this might be duplicate Yo! which in
+                # that case this will be a resend
+                if self.__state is States.YO_RCVD and src_addr is \
+                        self.__peer_addr:
+                    # TODO: send SYN_YO
+                    pass
+
+    def __reinit(self, ip_addr, state, peer_addr, init_seq_num,
+                 init_ack_num, recv_buffer_size):
+        self.__self_addr = (ip_addr, int)
+        self.__state = state
+        self.__peer_addr = peer_addr
+        self.__recv_buffer = RecvBuffer(init_ack_num, recv_buffer_size)
+        self.__send_buffer = SendBuffer(init_seq_num)
 
     # use this after first Yo! is sent
     def __process_active_open(self, src_ip, rcvd_segment):
