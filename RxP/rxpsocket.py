@@ -2,7 +2,7 @@ import random
 from asyncio import Queue
 from FxA.util import Util
 from RxP.RecvBuffer import RecvBuffer
-from RxP.RxProtocol import rxprotocol
+from RxP.RxProtocol import RxProtocol
 from RxP.SendBuffer import SendBuffer
 from exception import RxPException
 
@@ -25,26 +25,29 @@ class States:
 
 class rxpsocket:
     __logger = Util.setup_logger()
+    __udp_port = int(15000)
+    __proxy_addr = ('127.0.0.1', int(13000))
 
     # list of all states
     # Active open: OPEN->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
     # Passive open: OPEN->LISTEN->YO_RCVD->ESTABLISHED
     # Closing Initiator: CYA_SENT->CYA_WAIT->LAST_WAIT->CLOSED
     # Closing Responder: CLOSE_WAIT->LAST_WORD->CLOSED
-    def __init__(self, udp_port, proxy_addr=('127.0.0.1', int(13000))):
+    def __init__(self):
         self.__state = States.OPEN
         self.__proxy_addr = proxy_addr
-        self.__self_addr = ('127.0.0.1', int(0))
-        self.__peer_addr = ('', int(0))
+        self.__
+        self.__self_addr = None
+        self.__peer_addr = None
         self.__recv_buffer = None
         self.__send_buffer = None
-        self.__init_seq_num = int(0)
+        self.__init_seq_num = None
         self.__connected_client_queue = None
 
     def bind(self, address):
         if self.__port_num is None:
             self.__port_num = address[1]
-            if not rxprotocol.register(self):
+            if not RxProtocol.register(self):
                 self.__port_num = None
                 raise RxPException(106)
         else:
@@ -74,7 +77,7 @@ class rxpsocket:
         is_registered = False
         while count > 0 or not is_registered:
             self.__port_num = random.randrange(0, 65536)
-            is_registered = rxprotocol.register(self)
+            is_registered = RxProtocol.register(self)
             if not is_registered:
                 self.__port_num = None
             count -= 1

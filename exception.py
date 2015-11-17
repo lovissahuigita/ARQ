@@ -11,7 +11,10 @@ class InvalidIP4Format(Exception):
     pass
 
 
-class UnexpectedMessage(object):
+class UnexpectedMessage(Exception):
+    pass
+
+class NetworkReinitException(Exception):
     pass
 
 

@@ -1,17 +1,34 @@
 import socket
 from random import randint
-from exception import RxPException
+
+from exception import RxPException, NetworkReinitException
 
 __author__ = 'Lovissa Winyoto'
 
 
 class RxProtocol:
     __sockets = {}  # key: (client_ip_addr, client_port_num) value: socket
-    __port_number = {}  # key: (client_ip_addr, client_port_num) value: my port number
-    __port_to_addr = {}  # key: my port number value: (client_ip_addr, client_port_num)
+    __port_number = {}  # key: (client_ip_addr, client_port_num) value: my
+    # port number
+    __port_to_addr = {}  # key: my port number value: (client_ip_addr,
+    # client_port_num)
 
-    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_sock.bind(address)  # TODO: what is the address
+    # socket that glued RxP layer with network layer
+    __udp_sock = None
+
+    # first hop of every segment sent out of this layer
+    __proxy_addr = None
+
+    BUFF_SIZE = int(2048)
+
+    @classmethod
+    def open_network(cls, udp_port, proxy_addr):
+        if cls.__udp_sock is not None:
+            raise NetworkReinitException()
+        else:
+            cls.__udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            cls.__udp_sock.bind(('', udp_port))
+            cls.__proxy_addr = proxy_addr
 
     @classmethod
     def get_available_port(cls):
@@ -21,10 +38,11 @@ class RxProtocol:
         return port
 
     @classmethod
-    def register(cls, soc, port, addr_port = (0, 0)):
+    def register(cls, soc, port=get_available_port(), addr_port=(0, 0)):
         if cls.__sockets[addr_port] is None:
             cls.__sockets[addr_port] = soc
-            if cls.__port_to_addr[port] is None:  # if port is available (which it should be)
+            if cls.__port_to_addr[
+                port] is None:  # if port is available (which it should be)
                 cls.__sockets[addr_port] = soc
                 cls.__port_number[addr_port] = port
                 cls.__port_to_addr[port] = addr_port
@@ -48,15 +66,16 @@ class RxProtocol:
 
     @classmethod
     def __receive(cls):
-        received = cls.udp_sock.recvfrom(udp_port_num) # TODO: Update the port num
-        data = received[0]
-        addr_port = received[1]
-        if addr_port in cls.__sockets.keys():
-            dst_socket = cls.__sockets[addr_port]
-        else:
-            dst_socket = cls.__sockets[cls.__port_to_addr[addr_port[1]]]
-        dst_socket._process_rcvd(addr_port[0], data)
+        while True:
+            received = cls.__udp_sock.recvfrom(cls.BUFF_SIZE)
+            data = received[0]
+            addr_port = received[1]
+            if addr_port in cls.__sockets.keys():
+                dst_socket = cls.__sockets[addr_port]
+            else:
+                dst_socket = cls.__sockets[cls.__port_to_addr[addr_port[1]]]
+            dst_socket._process_rcvd(addr_port[0], data)
 
     @classmethod
     def send(cls, data, address):
-        cls.udp_sock.sendto(data, address)
+        cls.__udp_sock.sendto(data, address)
