@@ -5,37 +5,37 @@ from exception import RxPException
 __author__ = 'Lovissa Winyoto'
 
 
-class rxprotocol:
+class RxProtocol:
     __sockets = {}  # key: (client_ip_addr, client_port_num) value: socket
     __port_number = {}  # key: (client_ip_addr, client_port_num) value: my port number
-    __port_to_addr = {} # key: my port number value: (client_ip_addr, client_port_num)
+    __port_to_addr = {}  # key: my port number value: (client_ip_addr, client_port_num)
 
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_sock.bind(address)  # TODO: what is the address
 
     @classmethod
     def get_available_port(cls):
-        port = randint(0,65536)
+        port = randint(0, 65536)
         while port in cls.__port_to_addr.keys():
-            port = randint(0,65536)
+            port = randint(0, 65536)
         return port
 
     @classmethod
-    def register(cls, socket, port, addr_port = (0, 0)):
+    def register(cls, soc, port, addr_port = (0, 0)):
         if cls.__sockets[addr_port] is None:
-            cls.__sockets[addr_port] = socket
+            cls.__sockets[addr_port] = soc
             if cls.__port_to_addr[port] is None:  # if port is available (which it should be)
-                cls.__sockets[addr_port] = socket
+                cls.__sockets[addr_port] = soc
                 cls.__port_number[addr_port] = port
                 cls.__port_to_addr[port] = addr_port
                 return True
             return False
         else:
-            raise RxPException(105); # TODO: correct number?
+            raise RxPException(105)  # TODO: correct number?
 
     @classmethod
-    def unregister(cls, socket):
-        port_addr = (socket._get_ip_address, socket._get_port_num)
+    def unregister(cls, soc):
+        port_addr = (soc._get_ip_address, soc._get_port_num)
         if port_addr in cls.__sockets:
             deleted = cls.__sockets[port_addr]
             my_port = cls.__port_number[port_addr]
@@ -56,8 +56,6 @@ class rxprotocol:
         else:
             dst_socket = cls.__sockets[cls.__port_to_addr[addr_port[1]]]
         dst_socket._process_rcvd(addr_port[0], data)
-
-
 
     @classmethod
     def send(cls, data, address):
