@@ -102,6 +102,9 @@ class rxpsocket:
     def _get_addr(self):
         return self.__ip_addr
 
+    def _get_port_num(self):
+        return self.__port_num
+
     # Process header for control related information
     # and then pass the segment to buffer to process data related
     # information

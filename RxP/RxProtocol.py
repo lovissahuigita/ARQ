@@ -34,6 +34,19 @@ class rxprotocol:
             raise RxPException(105); # TODO: correct number?
 
     @classmethod
+    def unregister(cls, socket):
+        port_addr = (socket._get_ip_address, socket._get_port_num)
+        if port_addr in cls.__sockets:
+            deleted = cls.__sockets[port_addr]
+            my_port = cls.__port_number[port_addr]
+            del cls.__sockets[port_addr]
+            del cls.__port_number[port_addr]
+            del cls.__port_to_addr[my_port]
+            return deleted
+        else:
+            return None
+
+    @classmethod
     def __receive(cls):
         received = cls.udp_sock.recvfrom(udp_port_num) # TODO: Update the port num
         data = received[0]
