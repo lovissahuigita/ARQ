@@ -27,8 +27,8 @@ class rxpsocket:
     __logger = Util.setup_logger()
 
     # list of all states
-    # Active open: CLOSED->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
-    # Passive open: CLOSED->LISTEN->YO_RCVD->ESTABLISHED
+    # Active open: OPEN->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
+    # Passive open: OPEN->LISTEN->YO_RCVD->ESTABLISHED
     # Closing Initiator: CYA_SENT->CYA_WAIT->LAST_WAIT->CLOSED
     # Closing Responder: CLOSE_WAIT->LAST_WORD->CLOSED
     def __init__(self, udp_port, proxy_addr=('127.0.0.1', int(13000))):

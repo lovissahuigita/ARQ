@@ -67,8 +67,14 @@ class RecvBuffer:
                                inbound_segment.get_seq_num)
         return data_len
 
-    def take(self, max):
+    # Take buffered segment's data.
+    #
+    # @max_read          max number of bytes to be read
+    # return data   list of data bytes with at most @max_read long
+    def take(self, max_read):
         data = []
-
-
-        pass
+        lim = min(max_read, self.__recv_last_ackd - self.__recv_base)
+        for i in range(0, lim):
+            data.append(self.__recv_buffer.popleft())
+        self.__recv_base += lim
+        return data
