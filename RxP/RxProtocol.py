@@ -38,6 +38,10 @@ class RxProtocol:
         return port
 
     @classmethod
+    def is_available_port(cls, port_num):
+        return port_num in cls.__port_to_addr
+
+    @classmethod
     def register(cls, soc, port=get_available_port(), addr_port=(0, 0)):
         if cls.__sockets[addr_port] is None:
             cls.__sockets[addr_port] = soc

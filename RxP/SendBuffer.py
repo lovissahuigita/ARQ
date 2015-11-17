@@ -25,11 +25,6 @@ class SendBuffer:
     def put(self, data):
         pass
 
-    def send_yo(self):
-        pass
-
-    def send_syn_yo(self):
-        pass
 
 # def sendSegments(self):
 #

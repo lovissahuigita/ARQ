@@ -1,14 +1,16 @@
 # socket wrapper
 # map tcp socket function call to rxp socket function call
 import socket
-
 from exception import RxPException
 
 
 class sock:
-    def __init__(self, udp_port, proxy_addr=('127.0.0.1', 13000)):
-        self.__udp_port = udp_port
-        self.__proxy_addr = proxy_addr
+    @staticmethod
+    def initial_setup(udp_port=int(15000), proxy_addr=('127.0.0.1', int(
+        13000))):
+        pass
+
+    def __init__(self):
         try:
             self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except:
@@ -47,9 +49,8 @@ class sock:
 
     def accept(self):
         try:
-            ret = sock(self.__udp_port, self.__proxy_addr)
+            ret = sock()
             ret.__s, client_addr = self.__s.accept()
-            ret.__proxy_addr = self.__proxy_addr
             return ret, client_addr
         except OSError as err:
             if int(err.winerror) == 10038:
@@ -80,7 +81,7 @@ class sock:
                 raise
 
     # set receive buffer size to x segment
-    def set_buffer_size(x):
+    def set_buffer_size(self, x):
         pass
 
     def close(self):

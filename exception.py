@@ -38,9 +38,9 @@ class RxPException(Exception):
         103: 'Socket is already closed.',
         104: 'Socket is already connected.',
         105: 'Socket already bound.',
-        106: 'Socket is in use.',
+        106: 'Socket is in use (socket still active).',
         107: 'Connection force closed by peer.',
-        108: ''
+        108: 'Invalid state.'
     }
 
     def __init__(self, errno):

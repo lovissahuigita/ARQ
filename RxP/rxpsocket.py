@@ -7,6 +7,11 @@ from RxP.SendBuffer import SendBuffer
 from exception import RxPException
 
 
+# list of all states
+# Active open: OPEN->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
+# Passive open: OPEN->LISTEN->YO_RCVD->ESTABLISHED
+# Closing Initiator: CYA_SENT->CYA_WAIT->LAST_WAIT->CLOSED
+# Closing Responder: CLOSE_WAIT->LAST_WORD->CLOSED
 class States:
     OPEN = 'OPEN'
     CLOSED = 'CLOSED'
@@ -25,18 +30,18 @@ class States:
 
 class rxpsocket:
     __logger = Util.setup_logger()
-    __udp_port = int(15000)
-    __proxy_addr = ('127.0.0.1', int(13000))
 
-    # list of all states
-    # Active open: OPEN->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
-    # Passive open: OPEN->LISTEN->YO_RCVD->ESTABLISHED
-    # Closing Initiator: CYA_SENT->CYA_WAIT->LAST_WAIT->CLOSED
-    # Closing Responder: CLOSE_WAIT->LAST_WORD->CLOSED
+    # Attach RxP Layer to UDP Layer as the network layer.
+    #
+    # @udp_port     port number of the UDP socket to open
+    # @proxy_addr   address of the first hop of every segment sent out
+    @staticmethod
+    def initial_setup(udp_port=int(15000), proxy_addr=('127.0.0.1', int(
+        13000))):
+        RxProtocol.open_network(udp_port, proxy_addr)
+
     def __init__(self):
         self.__state = States.OPEN
-        self.__proxy_addr = proxy_addr
-        self.__
         self.__self_addr = None
         self.__peer_addr = None
         self.__recv_buffer = None
@@ -44,45 +49,51 @@ class rxpsocket:
         self.__init_seq_num = None
         self.__connected_client_queue = None
 
+    # Bind this socket to @address
+    #
+    # @address  address of this socket
     def bind(self, address):
-        if self.__port_num is None:
-            self.__port_num = address[1]
-            if not RxProtocol.register(self):
-                self.__port_num = None
-                raise RxPException(106)
-        else:
+        if self.__self_addr is not None:
             raise RxPException(105)
+        if RxProtocol.is_available_port(address[1]):
+            self.__self_addr = address
+        else:
+            raise RxPException(100)
 
-            # self.__ip_addr = '127.0.0.1' if len(address[0]) == 0 else
-            # address[0]
-            # if address[1] != :
-            #
-            # is_registered = False
-            # while not is_registered:
-            #     is_registered = rxprotocol.register(self, address)
-
+    # Listen at this socket for an incoming connection
+    #
+    # @max_num_queued   maximum number of client waiting to be served
     def listen(self, max_num_queued):
-        self.__connected_client_queue = Queue(maxsize=max_num_queued)
-        if self.__port_num is None:
-            self.__assign_random_port(self)
-            # TODO: this is not done
+        if self.__state is States.OPEN:
+            self.__state = States.LISTEN
+            if self.__self_addr is None:
+                RxProtocol.register(soc=self)
+            else:
+                RxProtocol.register(soc=self, port=self.__self_addr[1])
+            self.__connected_client_queue = Queue(maxsize=max_num_queued)
+            # TODO: change receive processor
+        else:
+            raise RxPException(108)
 
+    # Attempt to make connection to @address
+    #
+    # @address  address of host to be connected
     def connect(self, address):
-        if self.__port_num is None:
-            self.__assign_random_port(self)
-            # TODO: this is not done
-
-    def __assign_random_port(self):
-        count = 65536
-        is_registered = False
-        while count > 0 or not is_registered:
-            self.__port_num = random.randrange(0, 65536)
-            is_registered = RxProtocol.register(self)
-            if not is_registered:
-                self.__port_num = None
-            count -= 1
-        if not is_registered:
+        if self.__state is States.OPEN:
+            if self.__self_addr is None:
+                RxProtocol.register(soc=self, addr_port=address)
+            else:
+                RxProtocol.register(soc=self, port=self.__self_addr[1],
+                                    addr_port=address)
+            self.__state = States.YO_SENT
+            # TODO: send Yo!
+            # TODO: change receive processor
+        elif self.__state is States.CLOSED:
+            raise RxPException(103)
+        elif self.__state is States.LAST_WAIT:
             raise RxPException(106)
+        else:
+            raise RxPException(104)
 
     def accept(self):
         # conn is a new socket object usable to send and

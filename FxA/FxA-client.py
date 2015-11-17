@@ -2,14 +2,11 @@ import argparse
 import logging
 import re
 import traceback
-
 from FxA.sock import sock
 from FxA.util import Util
 from exception import ArgumentCountException, RxPException
 
 __logger = None
-__portNum = int
-__ne_addr = (str, int)
 __socket = None
 
 
@@ -18,8 +15,6 @@ def main():
     args = parser.parse_args()
 
     # need to redeclare to write to global vars
-    global __portNum
-    global __ne_addr
     global __socket
     global __logger
 
@@ -28,10 +23,11 @@ def main():
         __logger.setLevel(logging.DEBUG)
     else:
         __logger.setLevel(logging.ERROR)
-    __portNum, __ne_addr = Util.parse_args(args.X, args.A, args.P)
-    if __portNum % 2 == 1:
+    port_num, ne_addr = Util.parse_args(args.X, args.A, args.P)
+    if port_num % 2 == 1:
         Util.exit_error('X has to be even number')
 
+    sock.initial_setup(port_num, ne_addr)
     newsocketbind()
     help_message()
     prompt_user_command()
@@ -40,7 +36,7 @@ def main():
 def newsocketbind():
     try:
         global __socket
-        __socket = sock(__portNum, __ne_addr)
+        __socket = sock()
     except RxPException as err:
         Util.exit_error(str(err))
 
@@ -119,7 +115,7 @@ def command_wind(W):
     __logger.info('running command \'window\'')
     try:
         if len(W) == 0:
-            raise ArgumentCountException('window', 1, ('W'))
+            raise ArgumentCountException('window', 1, 'W')
         __socket.set_buffer_size(int(W))
     except ArgumentCountException as err:
         print(Util.ERROR_TAG + str(err))

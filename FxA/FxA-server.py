@@ -7,7 +7,6 @@ from FxA.util import Util
 from exception import NoMoreMessage, RxPException
 
 __logger = None
-__portNum = None
 __socket = None
 __serving_thread = None
 __terminated = False
@@ -19,7 +18,6 @@ def main():
 
     # need to redeclare to write to global vars
     global __logger
-    global __portNum
     global __socket
     global __serving_thread
 
@@ -28,11 +26,12 @@ def main():
         __logger.setLevel(logging.DEBUG)
     else:
         __logger.setLevel(logging.ERROR)
-    __portNum, ne_addr = Util.parse_args(args.X, args.A, args.P)
-    if __portNum % 2 == 0:
+    port_num, ne_addr = Util.parse_args(args.X, args.A, args.P)
+    if port_num % 2 == 0:
         Util.exit_error('X has to be odd number')
 
-    __socket = sock(__portNum, ne_addr)
+    sock.initial_setup(port_num, ne_addr)
+    __socket = sock()
     __socket.bind(('', 8000))
     __socket.listen(65535)
     __serving_thread = Thread(None, serve_client, 'client-server')
