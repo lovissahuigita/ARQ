@@ -1,5 +1,4 @@
 class Packet:
-
     def __init__(self, src_port, dst_port, seq_num, ack_num, data):
         self.__src_port = src_port
         self.__dst_port = dst_port
@@ -7,7 +6,7 @@ class Packet:
         self.__ack_num = ack_num
 
         self.__recv_window_size = 0
-        self.__checksum	= 0
+        self.__checksum = 0
 
         self.__yo = False
         self.__cya = False
@@ -41,3 +40,6 @@ class Packet:
 
     def set_cya(self):
         self.__cya = True
+
+    def set_ack(self):
+        self.__ack = True

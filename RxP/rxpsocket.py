@@ -1,6 +1,7 @@
 import random
 from asyncio import Queue
 from FxA.util import Util
+from RxP.Packeter import Packeter
 from RxP.RecvBuffer import RecvBuffer
 from RxP.RxProtocol import RxProtocol
 from RxP.SendBuffer import SendBuffer
@@ -25,7 +26,6 @@ class States:
     LAST_WAIT = 'LAST_WAIT'
     CLOSE_WAIT = 'CLOSE_WAIT'
     LAST_WORD = 'LAST_WORD'
-    LAST_WAIT = 'LAST_WAIT'
 
 
 class rxpsocket:
@@ -36,8 +36,8 @@ class rxpsocket:
     # @udp_port     port number of the UDP socket to open
     # @proxy_addr   address of the first hop of every segment sent out
     @staticmethod
-    def initial_setup(udp_port=int(15000), proxy_addr=('127.0.0.1', int(
-        13000))):
+    def initial_setup(udp_port=int(15000),
+                      proxy_addr=('127.0.0.1', int(13000))):
         RxProtocol.open_network(udp_port, proxy_addr)
 
     def __init__(self):
@@ -48,6 +48,7 @@ class rxpsocket:
         self.__send_buffer = None
         self.__init_seq_num = None
         self.__connected_client_queue = None
+        self.__inbound_processor = None
 
     # Bind this socket to @address
     #
@@ -71,7 +72,7 @@ class rxpsocket:
             else:
                 RxProtocol.register(soc=self, port=self.__self_addr[1])
             self.__connected_client_queue = Queue(maxsize=max_num_queued)
-            # TODO: change receive processor
+            self.__inbound_processor = self.__process_passive_open
         else:
             raise RxPException(108)
 
@@ -87,7 +88,7 @@ class rxpsocket:
                                     addr_port=address)
             self.__state = States.YO_SENT
             # TODO: send Yo!
-            # TODO: change receive processor
+            self.__inbound_processor = self.__process_active_open
         elif self.__state is States.CLOSED:
             raise RxPException(103)
         elif self.__state is States.LAST_WAIT:
@@ -103,7 +104,7 @@ class rxpsocket:
         # return (conn, address)
         pass
 
-    def send(self, bytes):
+    def send(self, data_bytes):
         pass
 
     def recv(self, buffsize):
@@ -114,21 +115,14 @@ class rxpsocket:
 
     # For internal use only
     def _get_addr(self):
-        return self.__ip_addr
-
-    def _get_port_num(self):
-        return self.__port_num
+        return self.__self_addr
 
     # Process header for control related information
     # and then pass the segment to buffer to process data related
     # information
     def _process_rcvd(self, src_ip, rcvd_segment):
-        # TODO: dont forget checksum
-        if rcvd_segment.get_cya:
-            # TODO: notify socket of CYA
-            pass
-
-        self.__recv_buffer.put(rcvd_segment)
+        if Packeter.validate_checksum(rcvd_segment):
+            self.__inbound_processor(src_ip, rcvd_segment)
 
     def __process_data_exchange(self, src_ip, rcvd_segment):
         src_addr = (src_ip, rcvd_segment.get_src_port())
@@ -136,6 +130,8 @@ class rxpsocket:
             if rcvd_segment.get_cya() and rcvd_segment.get_seq_num() == \
                     self.__recv_buffer.get_expected_seq_num():
                 self.__state = States.CLOSE_WAIT
+            else:
+                self.__recv_buffer.put(rcvd_segment)
 
     # use this after listen() is invoked
     def __process_passive_open(self, src_ip, rcvd_segment):
@@ -197,8 +193,8 @@ class rxpsocket:
                 # Need to check since this might be duplicate Yo! which in
                 # that case this will be a resend
                 if self.__state is States.SYN_YO_ACK_SENT and \
-                                self.__recv_buffer.get_base_seq_num() == \
-                                        rcvd_segment.get_seq_num() + 1:
+                    self.__recv_buffer.get_base_seq_num() == \
+                        rcvd_segment.get_seq_num() + 1:
                     # TODO: send SYN_YO_ACK
                     pass
             elif rcvd_segment.get_ack() and self.__state is \
@@ -207,7 +203,7 @@ class rxpsocket:
                     # ACTIVE OPEN: SYN_YO_ACK_SENT->ESTABLISHED
                     self.__state = States.ESTABLISHED
                     # TODO: process data
-                    # TODO: change receive processor
+                    self.__inbound_processor = self.__process_data_exchange
                 else:
                     # Failed to synchronize, server sent wrong ack number
                     # TODO: send SYN_YO_ACK

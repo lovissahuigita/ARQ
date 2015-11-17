@@ -25,6 +25,10 @@ class SendBuffer:
     def put(self, data):
         pass
 
+    # attempt to send any
+    def flush(self):
+        pass
+
 
 # def sendSegments(self):
 #
