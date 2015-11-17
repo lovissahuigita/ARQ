@@ -1,6 +1,5 @@
 import random
 from asyncio import Queue
-
 from FxA.util import Util
 from RxP.RecvBuffer import RecvBuffer
 from RxP.RxProtocol import rxprotocol
@@ -115,7 +114,11 @@ class rxpsocket:
         self.__recv_buffer.put(rcvd_segment)
 
     def __process_data_exchange(self, src_ip, rcvd_segment):
-        pass
+        src_addr = (src_ip, rcvd_segment.get_src_port())
+        if src_addr is self.__peer_addr:
+            if rcvd_segment.get_cya() and rcvd_segment.get_seq_num() == \
+                    self.__recv_buffer.get_expected_seq_num():
+                self.__state = States.CLOSE_WAIT
 
     # use this after listen() is invoked
     def __process_passive_open(self, src_ip, rcvd_segment):
@@ -185,6 +188,29 @@ class rxpsocket:
                     # Failed to synchronize, server sent wrong ack number
                     # TODO: send SYN_YO_ACK
                     pass
+
+    def __process_init_close(self, src_ip, rcvd_segment):
+        if rcvd_segment.get_ack() and rcvd_segment.get_ack_num() == \
+                self.__send_buffer.get_next_seq_num() \
+                and self.__state is States.CYA_SENT:
+            self.__send_buffer = None
+            self.__state = States.CYA_WAIT
+        elif rcvd_segment.get_cya() and rcvd_segment.get_seq_num() == \
+                self.__recv_buffer.get_expected_seq_num():
+            if self.__state is States.CYA_WAIT:
+                self.__state = States.LAST_WAIT
+            if self.__state is States.LAST_WAIT:
+                # TODO: send ACK
+                # TODO: once timeout, release receive buffer
+                pass
+
+    def __process_resp_close(self, src_ip, rcvd_segment):
+        if rcvd_segment.get_ack() and rcvd_segment.get_ack_num() == \
+                self.__send_buffer.get_next_seq_num() and self.__state is \
+                States.LAST_WORD:
+            self.__send_buffer = None
+            self.__recv_buffer = None
+            self.__state = States.CLOSED
 
     def _process_send(self, ):
         pass

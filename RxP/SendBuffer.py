@@ -10,6 +10,9 @@ class SendBuffer:
     def get_base_seq_num(self):
         return self.__send_base
 
+    def get_next_seq_num(self):
+        return self.__send_base + len(self.__send_buffer)
+
     # put data from user space into buffer
     def put(self, data):
         pass
@@ -18,7 +21,7 @@ class SendBuffer:
         pass
 
     def send_syn_yo(self):
-
+        pass
 
 # def sendSegments(self):
 #

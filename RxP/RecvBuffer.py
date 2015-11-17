@@ -19,6 +19,9 @@ class RecvBuffer:
     def get_base_seq_num(self):
         return self.__recv_base
 
+    def get_expected_seq_num(self):
+        return self.__recv_base + len(self.__recv_buffer)
+
     def get_buffer_size(self):
         return self.__recv_buffer.maxlen
 
