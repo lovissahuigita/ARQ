@@ -1,10 +1,18 @@
 import collections
 
+from FxA.util import Util
+
 
 class SendBuffer:
+    __logger = Util.setup_logger()
+
     def __init__(self, base_seq_num):
         self.__send_buffer = collections.deque()
+
+        #
         self.__send_ackd_buffer = collections.deque()
+
+        # sequence number of the first byte in the buffer
         self.__send_base = int(0)
 
     def get_base_seq_num(self):
