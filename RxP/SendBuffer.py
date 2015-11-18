@@ -26,7 +26,7 @@ class SendBuffer:
         pass
 
     # attempt to send any
-    def flush(self):
+    def flush(self, segments_qty):
         pass
 
 
