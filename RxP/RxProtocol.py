@@ -89,17 +89,16 @@ class RxProtocol:
     #
     # @dest_addr    address of the receiver
     # @msg          message to be transmitted
-    # @ms_interval  interval between retransmission in ms
+    # @ms_interval  function that return interval between retransmission in ms
     # @stop_func    function with no param that return True when
     #               this function should stop
     @classmethod
     def ar_send(cls, dest_addr, msg, ms_interval, stop_func=lambda: False):
         def dispatcher():
-            sec_interval = ms_interval / 1000
             cls.send(dest_addr, msg)
-            time.sleep(sec_interval)
+            time.sleep(ms_interval() / 1000)
             while not stop_func():
                 cls.send(dest_addr, msg)
-                time.sleep(sec_interval)
+                time.sleep(ms_interval() / 1000)
 
         threading.Thread(target=dispatcher).start()

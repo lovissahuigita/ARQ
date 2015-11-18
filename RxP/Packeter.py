@@ -40,7 +40,8 @@ class Packeter:
         packet.setCheckSum(0)
         return checksum == cls.__compute_checksum(packet)
 
-    def control_packet(self, src_port, dst_port, seq_num, ack_num, yo=False,
+    @classmethod
+    def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
                        cya=False, ack=False):
         cp = Packet(src_port, dst_port, seq_num, ack_num, None)
         if yo:
@@ -49,4 +50,4 @@ class Packeter:
             cp.set_cya()
         if ack:
             cp.set_ack()
-        return self.__compute_checksum(cp)
+        return cls.__compute_checksum(cp)

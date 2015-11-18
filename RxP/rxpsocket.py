@@ -2,8 +2,8 @@ import random
 from asyncio import Queue
 
 from FxA.util import Util
-from RxP import RTOEstimator
 from RxP.Packeter import Packeter
+from RxP.RTOEstimator import RTOEstimator
 from RxP.RecvBuffer import RecvBuffer
 from RxP.RxProtocol import RxProtocol
 from RxP.SendBuffer import SendBuffer
@@ -52,7 +52,7 @@ class rxpsocket:
         self.__send_buffer = None
         self.__init_seq_num = None
         self.__connected_client_queue = None
-        self.__inbound_processor = None
+        self.__inbound_processor = lambda src_port, rcvd_segment: None
 
     # Bind this socket to @address
     #
@@ -113,7 +113,7 @@ class rxpsocket:
             RxProtocol.ar_send(
                 dest_addr=address,
                 msg=first_yo,
-                ms_interval=RTOEstimator.get_rto_interval(),
+                ms_interval=RTOEstimator.get_rto_interval,
                 stop_func=term_func,
             )
             self.__peer_addr = address
@@ -182,7 +182,6 @@ class rxpsocket:
                     # TODO: send ACK with data
                 else:
                     # failed to sync, peer send wrong ack number
-                    # TODO: Resend SYN_YO
                     pass
             else:
                 # Received YO! segment
@@ -192,11 +191,10 @@ class rxpsocket:
                     self.__init_seq_num = random.randint(0, 4294967296)
                     self.__state = States.YO_RCVD
 
-                # Need to check since this might be duplicate Yo! which in
-                # that case this will be a resend
-                if self.__state is States.YO_RCVD and src_addr is \
-                        self.__peer_addr:
-                    # TODO: send SYN_YO
+                    def term_func():
+                        RTOEstimator.rt_update()
+                        return self.__state is States.ESTABLISHED
+
                     syn_yo = Packeter.control_packet(
                         src_port=self.__self_addr[1],
                         dst_port=src_addr[1],
@@ -204,7 +202,13 @@ class rxpsocket:
                         ack_num=0,
                         yo=True
                     )
-                    pass
+
+                    RxProtocol.ar_send(
+                        dest_addr=src_addr,
+                        msg=syn_yo,
+                        ms_interval=RTOEstimator.get_rto_interval,
+                        stop_func=term_func,
+                    )
 
     def __reinit(self, ip_addr, state, peer_addr, init_seq_num,
                  init_ack_num, recv_buffer_size):
@@ -233,12 +237,10 @@ class rxpsocket:
                     )
                     self.__state = States.SYN_YO_ACK_SENT
 
-                # Need to check since this might be duplicate Yo! which in
-                # that case this will be a resend
-                if self.__state is States.SYN_YO_ACK_SENT and \
-                                self.__recv_buffer.get_base_seq_num() == \
-                                        _rcvd_segment.get_seq_num() + 1:
-                    # TODO: send SYN_YO_ACK
+                    def term_func():
+                        RTOEstimator.rt_update()
+                        return self.__state is States.ESTABLISHED
+
                     syn_yo_ack = Packeter.control_packet(
                         src_port=self.__self_addr[1],
                         dst_port=src_addr[1],
@@ -246,6 +248,12 @@ class rxpsocket:
                         ack_num=_rcvd_segment.get_seq_num() + 1,
                         yo=True,
                         ack=True
+                    )
+                    RxProtocol.ar_send(
+                        dest_addr=src_addr,
+                        msg=syn_yo_ack,
+                        ms_interval=RTOEstimator.get_rto_interval,
+                        stop_func=term_func
                     )
             elif _rcvd_segment.get_ack() and self.__state is \
                     States.SYN_YO_ACK_SENT:
@@ -256,7 +264,6 @@ class rxpsocket:
                     self.__inbound_processor = self.__process_data_exchange
                 else:
                     # Failed to synchronize, server sent wrong ack number
-                    # TODO: send SYN_YO_ACK
                     pass
 
     def __process_init_close(self, _src_ip, _rcvd_segment):
