@@ -1,6 +1,5 @@
 import random
 from asyncio import Queue
-
 from FxA.util import Util
 from RxP.Packeter import Packeter
 from RxP.RTOEstimator import RTOEstimator
@@ -9,12 +8,14 @@ from RxP.RxProtocol import RxProtocol
 from RxP.SendBuffer import SendBuffer
 from exception import RxPException
 
-
 # list of all states
 # Active open: OPEN->YO_SENT->SYN_YO_ACK_SENT->ESTABLISHED
 # Passive open: OPEN->LISTEN->YO_RCVD->ESTABLISHED
 # Closing Initiator: CYA_SENT->CYA_WAIT->LAST_WAIT->CLOSED
 # Closing Responder: CLOSE_WAIT->LAST_WORD->CLOSED
+MAX_SEQ_NUM = 4294967296
+
+
 class States:
     OPEN = 'OPEN'
     CLOSED = 'CLOSED'
@@ -50,7 +51,8 @@ class rxpsocket:
         self.__peer_addr = None
         self.__recv_buffer = None
         self.__send_buffer = None
-        self.__init_seq_num = None
+        self.__next_seq_num = None
+        self.__next_ack_num = None
         self.__connected_client_queue = None
         self.__inbound_processor = lambda src_port, rcvd_segment: None
 
@@ -98,11 +100,12 @@ class rxpsocket:
             def term_func():
                 RTOEstimator.rt_update()
                 term_func.tries -= 1
-                return self.__state is States.SYN_YO_ACK_SENT or \
+                return self.__state is not States.YO_SENT or \
                        term_func.tries == 0
 
             term_func.tries = self.MAX_INIT_RETRIES
-
+            self.__peer_addr = address
+            self.__inbound_processor = self.__process_active_open
             first_yo = Packeter.control_packet(
                 src_port=self.__self_addr[1],
                 dst_port=address[1],
@@ -116,8 +119,6 @@ class rxpsocket:
                 ms_interval=RTOEstimator.get_rto_interval,
                 stop_func=term_func,
             )
-            self.__peer_addr = address
-            self.__inbound_processor = self.__process_active_open
         elif self.__state is States.CLOSED:
             raise RxPException(errno=103)
         elif self.__state is States.LAST_WAIT:
@@ -134,13 +135,57 @@ class rxpsocket:
         pass
 
     def send(self, data_bytes):
-        pass
+        self.__next_seq_num = self.__send_buffer.put(
+            src_port=self.__self_addr[1],
+            dst_port=self.__peer_addr[1],
+            seq_num=self.__next_seq_num,
+            data=data_bytes
+        )
+        # TODO: return number of bytes sent
 
     def recv(self, buffsize):
         pass
 
     def close(self):
-        pass
+        cya = Packeter.control_packet(
+            src_port=self.__self_addr[1],
+            dst_port=self.__peer_addr[1],
+            seq_num=self.__next_seq_num,
+            ack_num=self.__next_ack_num,
+            cya=True
+        )
+        self.__increment_next_seq_num()
+        if self.__state is States.ESTABLISHED:
+            self.__state = States.CYA_SENT
+            self.__inbound_processor = self.__process_init_close
+
+            def term_func():
+                RTOEstimator.rt_update()
+                return self.__state is not States.CYA_SENT
+
+            RxProtocol.ar_send(
+                dest_addr=self.__peer_addr,
+                msg=cya,
+                ms_interval=RTOEstimator.get_rto_interval,
+                stop_func=term_func
+            )
+
+        elif self.__state is States.CLOSE_WAIT:
+            self.__state = States.LAST_WORD
+            self.__inbound_processor = self.__process_resp_close
+
+            def term_func():
+                RTOEstimator.rt_update()
+                return self.__state is not States.LAST_WORD
+
+            # TODO: might need a way to immediately close after ACK rcvd,
+            # how to notify a sleeping thread?
+            RxProtocol.ar_send(
+                dest_addr=self.__peer_addr,
+                msg=cya,
+                ms_interval=RTOEstimator.get_rto_interval,
+                stop_func=term_func
+            )
 
     # For internal use only
     def _get_addr(self):
@@ -155,40 +200,40 @@ class rxpsocket:
 
     def __process_data_exchange(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
-        if src_addr is self.__peer_addr:
-            if _rcvd_segment.get_cya() and _rcvd_segment.get_seq_num() == \
-                    self.__recv_buffer.get_expected_seq_num():
+        if src_addr is self.__peer_addr and \
+                        _rcvd_segment.get_seq_num() == self.__next_ack_num:
+            if _rcvd_segment.get_cya():
+                self.__increment_next_ack_num()
                 self.__state = States.CLOSE_WAIT
             else:
-                self.__recv_buffer.put(_rcvd_segment)
+                self.__next_ack_num = self.__recv_buffer.put(
+                    acknum=self.__next_ack_num,
+                    inbound_segment=_rcvd_segment
+                )
 
     # use this after listen() is invoked
     def __process_passive_open(self, _src_ip, _rcvd_segment):
         client_queue = self.__connected_client_queue
         if not client_queue.full() and _rcvd_segment.get_yo():
             src_addr = (_src_ip, _rcvd_segment.get_src_port())
-            if _rcvd_segment.get_ack() and src_addr is self.__peer_addr:
+            if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+                    self.__next_seq_num and src_addr is self.__peer_addr:
                 # Received YO!+ACK segment
-                if _rcvd_segment.get_ack_num() == self.__init_seq_num + 1:
-                    # PASSIVE OPEN: YO_RCVD->ESTABLISHED
-                    self.__recv_buffer = RecvBuffer(
-                        base_seq_num=_rcvd_segment.get_seq_num() + 1
-                    )
-                    self.__send_buffer = SendBuffer(
-                        base_seq_num=self.__init_seq_num + 1
-                    )
-                    self.__state = States.LISTEN
-                    # TODO: make new socket for the new client and enqueue
-                    # TODO: send ACK with data
-                else:
-                    # failed to sync, peer send wrong ack number
-                    pass
+                # PASSIVE OPEN: YO_RCVD->ESTABLISHED
+                self.__recv_buffer = RecvBuffer()
+                self.__send_buffer = SendBuffer()
+                self.__next_ack_num = _rcvd_segment.get_seq_num()
+                self.__increment_next_ack_num()
+                self.__state = States.LISTEN
+                # TODO: make new socket for the new client and enqueue
+                # TODO: send ACK with data
+                # TODO: put seq num only if it contains data
             else:
                 # Received YO! segment
                 if self.__state is States.LISTEN:
                     # PASSIVE OPEN: LISTEN->YO_RCVD
                     self.__peer_addr = src_addr
-                    self.__init_seq_num = random.randint(0, 4294967296)
+                    self.__next_seq_num = random.randint(0, MAX_SEQ_NUM)
                     self.__state = States.YO_RCVD
 
                     def term_func():
@@ -198,7 +243,7 @@ class rxpsocket:
                     syn_yo = Packeter.control_packet(
                         src_port=self.__self_addr[1],
                         dst_port=src_addr[1],
-                        seq_num=self.__init_seq_num,
+                        seq_num=self.__next_seq_num,
                         ack_num=0,
                         yo=True
                     )
@@ -209,17 +254,17 @@ class rxpsocket:
                         ms_interval=RTOEstimator.get_rto_interval,
                         stop_func=term_func,
                     )
+                    self.__increment_next_seq_num()
 
     def __reinit(self, ip_addr, state, peer_addr, init_seq_num,
                  init_ack_num, recv_buffer_size):
         self.__self_addr = (ip_addr, int)
         self.__state = state
         self.__peer_addr = peer_addr
-        self.__recv_buffer = RecvBuffer(
-            base_seq_num=init_ack_num,
-            buffer_size=recv_buffer_size
-        )
-        self.__send_buffer = SendBuffer(base_seq_num=init_seq_num)
+        self.__next_seq_num = init_seq_num
+        self.__next_ack_num = init_ack_num
+        self.__recv_buffer = RecvBuffer(buffer_size=recv_buffer_size)
+        self.__send_buffer = SendBuffer()
 
     # use this after first Yo! is sent
     def __process_active_open(self, _src_ip, _rcvd_segment):
@@ -228,13 +273,11 @@ class rxpsocket:
             if _rcvd_segment.get_yo():
                 if self.__state is States.YO_SENT:
                     # ACTIVE OPEN: YO_SENT->SYN_YO_ACK_SENT
-                    self.__init_seq_num = random.randint(0, 4294967296)
-                    self.__recv_buffer = RecvBuffer(
-                        base_seq_num=_rcvd_segment.get_seq_num() + 1
-                    )
-                    self.__send_buffer = SendBuffer(
-                        base_seq_num=self.__init_seq_num + 1
-                    )
+                    self.__next_seq_num = random.randint(0, MAX_SEQ_NUM)
+                    self.__next_ack_num = _rcvd_segment.get_seq_num()
+                    self.__increment_next_ack_num()
+                    self.__recv_buffer = RecvBuffer()
+                    self.__send_buffer = SendBuffer()
                     self.__state = States.SYN_YO_ACK_SENT
 
                     def term_func():
@@ -255,39 +298,57 @@ class rxpsocket:
                         ms_interval=RTOEstimator.get_rto_interval,
                         stop_func=term_func
                     )
-            elif _rcvd_segment.get_ack() and self.__state is \
+                    self.__increment_next_seq_num()
+            elif _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+                    self.__next_seq_num and _rcvd_segment.get_seq_num() == \
+                    self.__next_ack_num and self.__state is \
                     States.SYN_YO_ACK_SENT:
-                if _rcvd_segment.get_ack_num() == self.__init_seq_num + 1:
-                    # ACTIVE OPEN: SYN_YO_ACK_SENT->ESTABLISHED
-                    self.__state = States.ESTABLISHED
-                    # TODO: process data
-                    self.__inbound_processor = self.__process_data_exchange
-                else:
-                    # Failed to synchronize, server sent wrong ack number
-                    pass
+                # ACTIVE OPEN: SYN_YO_ACK_SENT->ESTABLISHED
+                self.__state = States.ESTABLISHED
+                # TODO: process data
+                self.__inbound_processor = self.__process_data_exchange
 
+    # TODO: BELOW IS WRONG!
     def __process_init_close(self, _src_ip, _rcvd_segment):
-        if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
-                self.__send_buffer.get_next_seq_num() \
-                and self.__state is States.CYA_SENT:
-            self.__send_buffer = None
-            self.__state = States.CYA_WAIT
-        elif _rcvd_segment.get_cya() and _rcvd_segment.get_seq_num() == \
-                self.__recv_buffer.get_expected_seq_num():
-            if self.__state is States.CYA_WAIT:
-                self.__state = States.LAST_WAIT
-            if self.__state is States.LAST_WAIT:
-                # TODO: send ACK
-                # TODO: once timeout, release receive buffer
-                pass
+        src_addr = (_src_ip, _rcvd_segment.get_src_port())
+        if src_addr is self.__peer_addr and _rcvd_segment.get_seq_num() == \
+                self.__next_ack_num:
+            if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+                    self.__next_seq_num \
+                    and self.__state is States.CYA_SENT:
+                self.__send_buffer = None
+                self.__state = States.CYA_WAIT
+            if _rcvd_segment.get_cya():
+                if self.__state is States.CYA_WAIT:
+                    self.__state = States.LAST_WAIT
+                if self.__state is States.LAST_WAIT:
+                    # TODO: send ACK
+                    # TODO: once timeout, release receive buffer
+                    last_ack = Packeter.control_packet(
+                        src_port=self.__self_addr[1],
+                        dst_port=_src_ip[1],
+                        seq_num=0,
+                        ack_num=self.__recv_buffer.get_expected_seq_num() + 1,
+                        ack=True
+                    )
+                    RxProtocol.send()
+                    pass
+            else:
+                self.__process_data_exchange(_src_ip, _rcvd_segment)
 
     def __process_resp_close(self, _src_ip, _rcvd_segment):
         if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
-                self.__send_buffer.get_next_seq_num() and self.__state is \
-                States.LAST_WORD:
+                self.__next_seq_num and _rcvd_segment.get_seq_num() == \
+                self.__next_ack_num and self.__state is States.LAST_WORD:
             self.__send_buffer = None
             self.__recv_buffer = None
             self.__state = States.CLOSED
 
     def _process_send(self, ):
         pass
+
+    def __increment_next_seq_num(self):
+        self.__next_seq_num = (self.__next_seq_num + 1) % MAX_SEQ_NUM
+
+    def __increment_next_ack_num(self):
+        self.__next_ack_num = (self.__next_ack_num + 1) % MAX_SEQ_NUM

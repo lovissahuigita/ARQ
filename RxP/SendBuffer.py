@@ -1,40 +1,49 @@
 import collections
-
 from FxA.util import Util
+from RxP.Packeter import Packeter
 
 
 class SendBuffer:
     __logger = Util.setup_logger()
 
-    def __init__(self, base_seq_num):
+    def __init__(self):
         self.__send_buffer = collections.deque()
 
-        #
-        self.__send_ackd_buffer = collections.deque()
+        # last ack_num rcvd from peer
+        self.__last_ackd = 0
 
-        # sequence number of the first byte in the buffer
-        self.__send_base = int(0)
+    # Remove any segment sent successfully from buffer
+    def notify_ack(self, last_acknum):
+        if last_acknum > self.__last_ackd:
+            self.__last_ackd = last_acknum
+            buffer = self.__send_buffer
+            while len(buffer) > 0 and buffer[0].get_seq_num() < last_acknum:
+                buffer.popleft()
 
-    def get_base_seq_num(self):
-        return self.__send_base
+    # return    next sequence number
+    def put(self, src_port, dst_port, seq_num, data):
+        for segment in Packeter.packetize(
+                src_port=src_port,
+                seq_num=seq_num,
+                dst_port=dst_port,
+                data=data
+        ):
+            self.__send_buffer.append(segment)
+        return seq_num + len(data)
 
-    def get_next_seq_num(self):
-        return self.__send_base + len(self.__send_buffer)
+    # put ack_num and ack_bit and checksum just before pushing segments to
+    # lower layer
+    def take(self, ack_num, max_segment=0):
+        buffer = self.__send_buffer
+        if max_segment == 0:
+            max_segment = len(buffer)
+        else:
+            max_segment = min(max_segment, len(buffer))
+        segments = []
+        for i in range(0, max_segment):
+            prepare = buffer[i]
+            prepare.set_ack(ack_num=ack_num)
+            # TODO: how to compute checksum here?
+            segments.append(prepare)
+        return segments
 
-    # put data from user space into buffer
-    def put(self, data):
-        pass
-
-    # attempt to send any
-    def flush(self, segments_qty):
-        pass
-
-
-# def sendSegments(self):
-#
-# # return number of packet sent but not yet ACK'd by receiver
-# def getNotReceivedCount(self):
-#
-# def processControlPacket(self, ctrlPacket): # to process FRR and ACK packets
-#
-# def setStartRestrasmitTimerCallBack(self, cb_startRestransmitTimer):

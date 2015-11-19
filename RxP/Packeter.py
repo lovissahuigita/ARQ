@@ -10,7 +10,7 @@ class Packeter:
     #  input data is already in binary 
     # this method breaks the binary to 544 bytes def
     @classmethod
-    def packetize(cls, src_port, dst_port, seq_num, ack_num, data):
+    def packetize(cls, src_port, dst_port, seq_num, data):
         packet_list = []
         leftover = len(data)
         start = 0
@@ -18,7 +18,7 @@ class Packeter:
         while leftover > 0:
             seq_num += end
             new_packet = cls.__compute_checksum(
-                Packet(src_port, dst_port, seq_num, ack_num, data[start:end]))
+                Packet(src_port, dst_port, seq_num, data[start:end]))
             packet_list.append(new_packet)
             leftover -= (end - start + 1)
             # update the index
@@ -43,11 +43,11 @@ class Packeter:
     @classmethod
     def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
                        cya=False, ack=False):
-        cp = Packet(src_port, dst_port, seq_num, ack_num, None)
+        cp = Packet(src_port, dst_port, seq_num, None)
         if yo:
             cp.set_yo()
         if cya:
             cp.set_cya()
         if ack:
-            cp.set_ack()
+            cp.set_ack(ack_num)
         return cls.__compute_checksum(cp)
