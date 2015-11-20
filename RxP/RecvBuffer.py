@@ -9,15 +9,24 @@ class RecvBuffer:
     __logger = Util.setup_logger()
 
     def __init__(self, buffer_size=int(1024)):
-        self.__empty_cond = threading.Condition(threading.Lock())
+        class_lock = threading.Lock()
+        self.__empty_cond = threading.Condition(class_lock)
+        self.__resize_cond = threading.Condition(class_lock)
         self.__recv_buffer = collections.deque(maxlen=buffer_size)
 
     # return buffer capacity in segment
     def get_buffer_size(self):
         return self.__recv_buffer.maxlen
 
-    def set_buffer_size(self, size_in_bytes):
-        pass
+    def set_buffer_size(self, size_in_segment):
+        self.__resize_cond.acquire()
+        self.__resize_cond.wait_for(len(self.__recv_buffer) < size_in_segment)
+        # once the recv buffer contains less segment than requested new size:
+        self.__recv_buffer = collections.deque(
+            iterable=self.__recv_buffer,
+            maxlen=size_in_segment
+        )
+        self.__resize_cond.release()
 
     # return current window size in segment
     def get_window_size(self):
@@ -50,5 +59,6 @@ class RecvBuffer:
                     data.append(byte)
             buffer.popleft()
             front = buffer[0].get_data()
+        self.__resize_cond.notify()
         self.__empty_cond.release()
         return data
