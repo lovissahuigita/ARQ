@@ -93,12 +93,11 @@ class RxProtocol:
     # @stop_func    function with no param that return True when
     #               this function should stop
     @classmethod
-    def ar_send(cls, dest_addr, msg, ms_interval, stop_func=lambda: False):
+    def ar_send(cls, dest_addr, msg, stop_func=lambda: False):
+
         def dispatcher():
             cls.send(dest_addr, msg)
-            time.sleep(ms_interval() / 1000)
             while not stop_func():
                 cls.send(dest_addr, msg)
-                time.sleep(ms_interval() / 1000)
 
         threading.Thread(target=dispatcher).start()
