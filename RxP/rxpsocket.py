@@ -287,7 +287,7 @@ class rxpsocket:
                     syn_yo_ack = Packeter.control_packet(
                         src_port=self.__self_addr[1],
                         dst_port=src_addr[1],
-                        seq_num=self.__init_seq_num,
+                        seq_num=self.__next_seq_num,
                         ack_num=_rcvd_segment.get_seq_num() + 1,
                         yo=True,
                         ack=True
@@ -313,12 +313,14 @@ class rxpsocket:
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr and _rcvd_segment.get_seq_num() == \
                 self.__next_ack_num:
+            # ACK of CYA, there might be a data here as well
             if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
                     self.__next_seq_num \
                     and self.__state is States.CYA_SENT:
                 self.__send_buffer = None
                 self.__state = States.CYA_WAIT
             if _rcvd_segment.get_cya():
+                # we dont want to accept any more data if CYA bit was set
                 if self.__state is States.CYA_WAIT:
                     self.__state = States.LAST_WAIT
                 if self.__state is States.LAST_WAIT:
@@ -332,20 +334,18 @@ class rxpsocket:
                         ack=True
                     )
                     RxProtocol.send()
-                    pass
             else:
                 self.__process_data_exchange(_src_ip, _rcvd_segment)
 
     def __process_resp_close(self, _src_ip, _rcvd_segment):
+        # there should not be any more data here, since the initiator
+        # supposed to already close their send buffer
         if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
                 self.__next_seq_num and _rcvd_segment.get_seq_num() == \
                 self.__next_ack_num and self.__state is States.LAST_WORD:
             self.__send_buffer = None
             self.__recv_buffer = None
             self.__state = States.CLOSED
-
-    def _process_send(self, ):
-        pass
 
     def __increment_next_seq_num(self):
         self.__next_seq_num = (self.__next_seq_num + 1) % MAX_SEQ_NUM
