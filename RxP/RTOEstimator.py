@@ -1,3 +1,4 @@
+
 class RTOEstimator:
     __rto           = 1000
     __estimated_rtt = 0
@@ -7,6 +8,7 @@ class RTOEstimator:
     def get_rto_interval(cls):
         return cls.__rto
 
+    # TODO: need a way to measure RTT
     @classmethod
     def update_rto_interval(cls, sample_rtt):
         cls.__estimated_rtt = cls.__estimated_rtt * 0.875 + 0.125 * sample_rtt

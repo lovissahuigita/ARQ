@@ -1,6 +1,7 @@
 import collections
 from FxA.util import Util
 
+# TODO: THIS IS NOT THREAD SAFE, NEED TO SYNC THIS CLASS
 
 # All Units of size are in segments!!!
 class RecvBuffer:

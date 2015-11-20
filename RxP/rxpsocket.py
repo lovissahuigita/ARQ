@@ -147,7 +147,19 @@ class rxpsocket:
         # is the address bound to the socket on the other
         # end of the connection
         # return (conn, address)
-        pass
+        # pool = ThreadPool(processes=1)
+        # res = pool.apply_async(
+        #     # TODO: do we need a new thread to wait?
+        # thread for the listening?
+        #     func=self.__connected_client_queue.get,
+        #     args=True
+        # )
+        # return res.get()
+        childsock = self.__connected_client_queue.get(block=True)
+        RxProtocol.register(
+            soc=childsock
+        )
+        return childsock
 
     def send(self, data_bytes):
         self.__next_seq_num = self.__send_buffer.put(
@@ -157,9 +169,10 @@ class rxpsocket:
             data=data_bytes
         )
         # TODO: return number of bytes sent
+        return len(data_bytes)
 
     def recv(self, buffsize):
-        pass
+        return self.__recv_buffer.take(maxread=buffsize)
 
     def close(self):
         cya = Packeter.control_packet(
@@ -206,13 +219,16 @@ class rxpsocket:
                 cond.release()
                 return ret
 
-            # TODO: might need a way to immediately close after ACK rcvd,
-            # how to notify a sleeping thread? cond var?
+            # hacked! might need a way to immediately close after ACK
+            # rcvd, how to notify a sleeping thread? cond var?
             RxProtocol.ar_send(
                 dest_addr=self.__peer_addr,
                 msg=cya,
                 stop_func=term_func
             )
+        elif self.__state is States.LISTEN:
+            # TODO: WHAT SHOULD I DO NOW?
+            pass
 
     # For internal use only
     def _get_addr(self):
@@ -256,7 +272,9 @@ class rxpsocket:
                 self.__state = States.LISTEN
                 cond.notify()
                 cond.release()
-                # TODO: make new socket for the new client and enqueue
+                client_queue.put(self.__spawn_kid())
+                # TODO: what if there are lots of client waiting, and this
+                # listening socket closed?
                 # TODO: let the new created socket send ACK with data
             else:
                 # Received YO! segment
@@ -291,15 +309,20 @@ class rxpsocket:
                     )
                     self.__increment_next_seq_num()
 
-    def __reinit(self, ip_addr, state, peer_addr, init_seq_num,
-                 init_ack_num, recv_buffer_size):
-        self.__self_addr = (ip_addr, int)
-        self.__state = state
-        self.__peer_addr = peer_addr
-        self.__next_seq_num = init_seq_num
-        self.__next_ack_num = init_ack_num
-        self.__recv_buffer = RecvBuffer(buffer_size=recv_buffer_size)
-        self.__send_buffer = SendBuffer()
+    def __spawn_kid(self):
+        # TODO: make sure this kid initialized with all the right value!!!!!
+        kiddy = rxpsocket()
+        kiddy.__self_addr = (self.__self_addr[0], 0)
+        kiddy.__state = States.ESTABLISHED
+        kiddy.__peer_addr = self.__peer_addr
+        kiddy.__next_seq_num = self.__next_seq_num
+        kiddy.__next_ack_num = self.__next_ack_num
+        kiddy.__recv_buffer = RecvBuffer(
+            buffer_size=self.__recv_buffer.get_buffer_size()
+        )
+        kiddy.__send_buffer = SendBuffer()
+        kiddy.__inbound_processor = kiddy.__process_data_exchange
+        return kiddy
 
     # use this after first Yo! is sent
     def __process_active_open(self, _src_ip, _rcvd_segment):
@@ -399,6 +422,7 @@ class rxpsocket:
             self.__recv_buffer = None
             self.__inbound_processor = lambda src_port, rcvd_segment: None
             self.__state = States.CLOSED
+            RxProtocol.unregister(self)
 
         self.__schedule_active_closure.scheder = \
             threading.Timer(LAST_WAIT_DUR_S, closure)
@@ -420,6 +444,7 @@ class rxpsocket:
             self.__state = States.CLOSED
             cond.notify()
             cond.release()
+            RxProtocol.unregister(self)
 
     def __increment_next_seq_num(self):
         self.__next_seq_num = (self.__next_seq_num + 1) % MAX_SEQ_NUM

@@ -1,4 +1,5 @@
 class Packet:
+    # TODO: HOW TO SET WINDOW SIZE?
     def __init__(self, src_port, dst_port, seq_num=0, data=None):
         if not data:
             data = []
