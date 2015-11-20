@@ -1,13 +1,15 @@
 import collections
+import threading
+
 from FxA.util import Util
 
-# TODO: THIS IS NOT THREAD SAFE, NEED TO SYNC THIS CLASS
 
 # All Units of size are in segments!!!
 class RecvBuffer:
     __logger = Util.setup_logger()
 
     def __init__(self, buffer_size=int(1024)):
+        self.__empty_cond = threading.Condition(threading.Lock())
         self.__recv_buffer = collections.deque(maxlen=buffer_size)
 
     # return buffer capacity in segment
@@ -23,10 +25,13 @@ class RecvBuffer:
 
     def put(self, ack_num, inbound_segment):
         buffer = self.__recv_buffer
+        self.__empty_cond.acquire()
         if len(buffer) < buffer.maxlen and inbound_segment.get_seq_num() == \
                 ack_num:
             buffer.append(inbound_segment)
             ack_num += max(len(inbound_segment.get_data()), 1)
+        self.__empty_cond.notify()
+        self.__empty_cond.release()
         return ack_num
 
     # Take buffered segment's data.
@@ -36,11 +41,14 @@ class RecvBuffer:
     def take(self, max_read):
         data = []
         buffer = self.__recv_buffer
+        self.__empty_cond.acquire()
         front = buffer[0].get_data()
+        self.__empty_cond.wait_for(len(buffer) > 0)
         while len(buffer) > 0 and len(data) + len(front) < max_read:
             if front is not None:
                 for byte in front:
                     data.append(byte)
             buffer.popleft()
             front = buffer[0].get_data()
+        self.__empty_cond.release()
         return data

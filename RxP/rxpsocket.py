@@ -241,7 +241,7 @@ class rxpsocket:
         if Packeter.validate_checksum(rcvd_segment):
             self.__inbound_processor(src_ip, rcvd_segment)
 
-    def __process_data_exchange(self, _src_ip, _rcvd_segment):
+    def __process_data_xchange(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr and \
                         _rcvd_segment.get_seq_num() == self.__next_ack_num:
@@ -321,7 +321,7 @@ class rxpsocket:
             buffer_size=self.__recv_buffer.get_buffer_size()
         )
         kiddy.__send_buffer = SendBuffer()
-        kiddy.__inbound_processor = kiddy.__process_data_exchange
+        kiddy.__inbound_processor = kiddy.__process_data_xchange
         return kiddy
 
     # use this after first Yo! is sent
@@ -377,7 +377,7 @@ class rxpsocket:
                 cond.notify()
                 cond.release()
                 # TODO: process data
-                self.__inbound_processor = self.__process_data_exchange
+                self.__inbound_processor = self.__process_data_xchange
 
     def __process_init_close(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
@@ -412,7 +412,7 @@ class rxpsocket:
                     )
                     self.__schedule_active_closure()
             else:
-                self.__process_data_exchange(_src_ip, _rcvd_segment)
+                self.__process_data_xchange(_src_ip, _rcvd_segment)
 
     def __schedule_active_closure(self):
         if self.__schedule_active_closure.scheder is not None:
