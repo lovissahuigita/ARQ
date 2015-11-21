@@ -26,19 +26,34 @@ class Packeter:
             end += cls.MSS if leftover >= cls.MSS else leftover
         return packet_list
 
+    @classmethod
+    def __carry_around(cls, a, b):  # TODO: is this right?
+        c = a + b
+        return (c & 0xffff) + (c >> 16)
+
+    @classmethod
+    def __checksum(cls, message):  # TODO: is this right?
+        s = 0
+        for i in range(0, len(message), 2):
+            word = ord(message[i] + ord(message[i + 1]) << 8)
+            s = cls.__carry_around(s, word)
+        return ~s & 0xffff
+
     # generate checksum for given data
     @classmethod
-    def __compute_checksum(cls, packet):
-        checksum = 0  # TODO: set this to the right value
+    def compute_checksum(cls, packet):
+        checksum = cls.__checksum(packet.get_data())  # TODO: set this to the right value
         packet.set_checksum(checksum)
         return packet
 
     # validate data integrity
     @classmethod
     def validate_checksum(cls, packet):
+        """Returns whether a packet is good based on checksum validation.
+        """
         checksum = packet.get_checksum()
         packet.setCheckSum(0)
-        return checksum == cls.__compute_checksum(packet)
+        return checksum == cls.compute_checksum(packet)
 
     @classmethod
     def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
@@ -50,4 +65,4 @@ class Packeter:
             cp.set_cya()
         if ack:
             cp.set_ack(ack_num)
-        return cls.__compute_checksum(cp)
+        return cls.compute_checksum(cp)

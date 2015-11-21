@@ -1,7 +1,7 @@
 import socket
 import threading
 from random import randint
-import time
+#import time
 from exception import RxPException, NetworkReinitException
 
 __author__ = 'Lovissa Winyoto'
