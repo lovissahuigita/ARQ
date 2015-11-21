@@ -1,7 +1,6 @@
 import random
 import threading
 from asyncio import Queue, Lock
-
 from FxA.util import Util
 from RxP.Packeter import Packeter
 from RxP.RTOEstimator import RTOEstimator
@@ -243,16 +242,42 @@ class rxpsocket:
 
     def __process_data_xchange(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
-        if src_addr is self.__peer_addr and \
-                        _rcvd_segment.get_seq_num() == self.__next_ack_num:
-            if _rcvd_segment.get_cya():
-                self.__increment_next_ack_num()
-                self.__state = States.CLOSE_WAIT
-            else:
-                self.__next_ack_num = self.__recv_buffer.put(
-                    acknum=self.__next_ack_num,
-                    inbound_segment=_rcvd_segment
-                )
+        if src_addr is self.__peer_addr:
+            self.__send_buffer.notify_ack(_rcvd_segment.get_ack_num())
+            if self.__is_expecting(_rcvd_segment):
+                if _rcvd_segment.get_cya():
+                    self.__increment_next_ack_num()
+                    self.__state = States.CLOSE_WAIT
+                else:
+                    self.__next_ack_num = self.__recv_buffer.put(
+                        acknum=self.__next_ack_num,
+                        inbound_segment=_rcvd_segment
+                    )
+            self.__flush_send()
+
+    def __flush_send(self):
+        flow_window = 0  # TODO: we have not keep track of peer window size
+        congestion_window = 0  # TODO: WE still dont have congestion window
+        flushed = self.__send_buffer.take(
+            ack_num=self.__next_ack_num,
+            # we still want to send 1 segment at a time even when peer
+            # closed their window so we know once it open
+            max_segment=max(min(flow_window, congestion_window), 1)
+        )
+        if len(flushed) == 0:
+            just_a_plain_old_ack = Packeter.control_packet(
+                src_port=self.__self_addr[1],
+                dst_port=self.__peer_addr[1],
+                seq_num=self.__next_seq_num,
+                ack_num=self.__next_ack_num,
+                ack=True
+            )
+            flushed.append(just_a_plain_old_ack)
+        for segment in flushed:
+            RxProtocol.send(
+                address=self.__peer_addr,
+                data=segment
+            )
 
     # use this after listen() is invoked
     def __process_passive_open(self, _src_ip, _rcvd_segment):
@@ -368,9 +393,8 @@ class rxpsocket:
                     )
                     self.__increment_next_seq_num()
             elif _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
-                    self.__next_seq_num and _rcvd_segment.get_seq_num() == \
-                    self.__next_ack_num and self.__state is \
-                    States.SYN_YO_ACK_SENT:
+                    self.__next_seq_num and self.__is_expecting(
+                _rcvd_segment) and self.__state is States.SYN_YO_ACK_SENT:
                 # ACTIVE OPEN: SYN_YO_ACK_SENT->ESTABLISHED
                 cond.acquire()
                 self.__state = States.ESTABLISHED
@@ -381,8 +405,7 @@ class rxpsocket:
 
     def __process_init_close(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
-        if src_addr is self.__peer_addr and _rcvd_segment.get_seq_num() == \
-                self.__next_ack_num:
+        if src_addr is self.__peer_addr and self.__is_expecting(_rcvd_segment):
             # ACK of CYA, there might be a data here as well
             if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
                     self.__next_seq_num and self.__state is States.CYA_SENT:
@@ -434,8 +457,8 @@ class rxpsocket:
         # there should not be any more data here, since the initiator
         # supposed to already close their send buffer
         if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
-                self.__next_seq_num and _rcvd_segment.get_seq_num() == \
-                self.__next_ack_num and self.__state is States.LAST_WORD:
+                self.__next_seq_num and self.__is_expecting(_rcvd_segment) \
+                and self.__state is States.LAST_WORD:
             self.__send_buffer = None
             self.__recv_buffer = None
             self.__inbound_processor = lambda src_port, rcvd_segment: None
@@ -451,3 +474,6 @@ class rxpsocket:
 
     def __increment_next_ack_num(self):
         self.__next_ack_num = (self.__next_ack_num + 1) % MAX_SEQ_NUM
+
+    def __is_expecting(self, segment):
+        return self.__next_ack_num == segment.get_seq_num()

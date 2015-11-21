@@ -44,6 +44,7 @@ class RxProtocol:
 
     @classmethod
     def register(cls, soc, port=get_available_port(), addr_port=(0, 0)):
+        # TODO: who will set the port number field on socket class?
         if cls.__sockets[addr_port] is None:
             cls.__sockets[addr_port] = soc
             if cls.__port_to_addr[

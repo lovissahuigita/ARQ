@@ -13,7 +13,11 @@ class SendBuffer:
         self.__last_ackd = 0
 
     # Remove any segment sent successfully from buffer
+    # now the ACK_NUM is what the peer expect next, not what they received last
+    # think if the last_acknum overflow, such that self.__last_ackd = 65535 and
+    # last_acknum is 5
     def notify_ack(self, last_acknum):
+        #TODO: below will not work, need another way...
         if last_acknum > self.__last_ackd:
             self.__last_ackd = last_acknum
             buffer = self.__send_buffer
