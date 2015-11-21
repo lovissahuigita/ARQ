@@ -28,21 +28,32 @@ class Packeter:
 
     @classmethod
     def __carry_around(cls, a, b):  # TODO: is this right?
+        """Make sure that the carry in from a check sum is being added properly"""
         c = a + b
         return (c & 0xffff) + (c >> 16)
 
     @classmethod
     def __checksum(cls, message):  # TODO: is this right?
+        """Calculate a data's checksum and make sure that the carry in
+        are added to the result"""
         s = 0
         for i in range(0, len(message), 2):
             word = ord(message[i] + ord(message[i + 1]) << 8)
             s = cls.__carry_around(s, word)
-        return ~s & 0xffff
+        return s
+
+    @classmethod
+    def __negated_checksum(cls, message):
+        """Negated the checksum result. The method is used when calculating a checksum
+        for a packet that will be sent"""
+        return ~(cls.__checksum(message)) & 0xffff
 
     # generate checksum for given data
     @classmethod
     def compute_checksum(cls, packet):
-        checksum = cls.__checksum(packet.get_data())  # TODO: set this to the right value
+        """Method to calculate checksum for packets that will be sent.
+        The checksum is negated"""
+        checksum = cls.__negated_checksum(packet.get_data())  # TODO: set this to the right value
         packet.set_checksum(checksum)
         return packet
 
@@ -50,10 +61,12 @@ class Packeter:
     @classmethod
     def validate_checksum(cls, packet):
         """Returns whether a packet is good based on checksum validation.
+        The method returns true if the checksum matches (packet is validated)
+        The method returns false if the checksum does not match
         """
         checksum = packet.get_checksum()
-        packet.setCheckSum(0)
-        return checksum == cls.compute_checksum(packet)
+        current_checksum = cls.__checksum(packet.get_data())
+        return (current_checksum + checksum) & 0xffff == 0
 
     @classmethod
     def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
