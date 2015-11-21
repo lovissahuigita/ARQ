@@ -1,6 +1,6 @@
 import random
 import threading
-from asyncio import Queue, Lock
+from asyncio import Queue
 from FxA.util import Util
 from RxP.Packeter import Packeter
 from RxP.RTOEstimator import RTOEstimator
@@ -49,7 +49,7 @@ class rxpsocket:
 
     def __init__(self):
         self.__state = States.OPEN
-        self.__state_cond = threading.Condition(Lock())
+        self.__state_cond = threading.Condition(threading.Lock())
         self.__self_addr = None
         self.__peer_addr = None
         self.__recv_buffer = None
