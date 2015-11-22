@@ -1,5 +1,6 @@
 import socket
 import threading
+import thread
 from random import randint
 #import time
 from exception import RxPException, NetworkReinitException
@@ -24,12 +25,14 @@ class RxProtocol:
 
     @classmethod
     def open_network(cls, udp_port, proxy_addr):
+        """Open a UDP socket."""
         if cls.__udp_sock is not None:
             raise NetworkReinitException()
         else:
             cls.__udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             cls.__udp_sock.bind(('', udp_port))
             cls.__proxy_addr = proxy_addr
+            thread.start_new_thread(cls.__receive, "Thread-Receive")
 
     @classmethod
     def get_available_port(cls):
