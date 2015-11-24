@@ -16,15 +16,16 @@ class SendBuffer:
     # now the ACK_NUM is what the peer expect next, not what they received last
     # think if the last_acknum overflow, such that self.__last_ackd = 65535 and
     # last_acknum is 5
-    def notify_ack(self, last_acknum):
+    def notify_ack(self, new_acknum):
         #TODO: below will not work, need another way...
-        if last_acknum > self.__last_ackd:
-            self.__last_ackd = last_acknum
+        is_overflow = self.__last_ackd - new_acknum > 2147483647
+        if new_acknum > self.__last_ackd or is_overflow:
+            self.__last_ackd = new_acknum
             buffer = self.__send_buffer
-            while len(buffer) > 0 and buffer[0].get_seq_num() < last_acknum:
+            while len(buffer) > 0 and (buffer[0].get_seq_num() < new_acknum or (is_overflow and buffer[0].get_seq_num() > new_acknum)):  #TODO: kayaknya bener sih
                 buffer.popleft()
 
-    # return    next sequence number
+    # return next sequence number
     def put(self, src_port, dst_port, seq_num, data):
         for segment in Packeter.packetize(
                 src_port=src_port,
