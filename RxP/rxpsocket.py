@@ -58,6 +58,7 @@ class rxpsocket:
         self.__next_ack_num = None
         self.__connected_client_queue = None
         self.__inbound_processor = lambda src_port, rcvd_segment: None
+        self.__peer_window_size = None
 
     # Bind this socket to @address
     #
@@ -244,6 +245,7 @@ class rxpsocket:
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr:
             self.__send_buffer.notify_ack(_rcvd_segment.get_ack_num())
+            self.__peer_window_size = _rcvd_segment.get_window_size()
             if self.__is_expecting(_rcvd_segment):
                 if _rcvd_segment.get_cya():
                     self.__increment_next_ack_num()
@@ -256,7 +258,7 @@ class rxpsocket:
             self.__flush_send()
 
     def __flush_send(self):
-        flow_window = 0  # TODO: we have not keep track of peer window size
+        flow_window = self.__peer_window_size
         congestion_window = 0  # TODO: WE still dont have congestion window
         flushed = self.__send_buffer.take(
             ack_num=self.__next_ack_num,

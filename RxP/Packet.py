@@ -38,7 +38,7 @@ class Packet:
     def get_window_size(self):
         return self.__recv_window_size
 
-    def set_window_set(self, new_size):
+    def set_window_size(self, new_size):
         self.__recv_window_size = new_size
 
     def set_checksum(self, checksum):
