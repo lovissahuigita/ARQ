@@ -53,3 +53,30 @@ class Packet:
     def set_ack(self, ack_num):
         self.__ack = True
         self.__ack_num = ack_num
+
+    def is_yo(self):
+        return self.__yo
+
+    def is_cya(self):
+        return self.__cya
+
+    def is_ack(self):
+        return self.__ack
+
+    def __str(self):
+        data = None
+        if self.is_yo():
+            data = "YO!"
+        elif self.is_cya():
+            data = "CYA!"
+        else:
+            data = "Data"
+        if self.is_ack():
+            if not data:
+                data = "ACK"
+            else:
+                data += ", ACK"
+        return "Packet Description: \nSource Port          : " + self.__src_port + "\nDestination Port      : "\
+               + self.__dst_port + "\nSequence Number      : " + self.__seq_num + "\nAcknowledgement Number : "\
+               + self.__ack_num + "\nWindow Size          : " + self.__recv_window_size + "\nChecksum           : "\
+               + self.__checksum + "\nType                 : " + data + "\nData          : " + self.__data + "\n"
