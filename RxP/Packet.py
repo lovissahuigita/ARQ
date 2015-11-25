@@ -63,7 +63,7 @@ class Packet:
     def is_ack(self):
         return self.__ack
 
-    def __str(self):
+    def __str__(self):
         data = None
         if self.is_yo():
             data = "YO!"
