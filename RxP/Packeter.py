@@ -58,7 +58,7 @@ class Packeter:
         :param packet: the packet to be checksummed
         :return: the checksum of the packet
         """
-        bytes = cls.__binarize(packet)
+        bytes = cls.binarize(packet)
         s = 0
         ptr = 0
         while ptr < len(bytes):
@@ -131,7 +131,7 @@ class Packeter:
         return cls.compute_checksum(cp)
 
     @staticmethod
-    def __binarize(segment):
+    def binarize(segment):
         """
         Convert anything to binary
         :param segment: anything
@@ -142,7 +142,7 @@ class Packeter:
         return buff.getvalue()
 
     @staticmethod
-    def __objectize(binary):
+    def objectize(binary):
         """
         Converts binary to anything
         :param binary: the binary
