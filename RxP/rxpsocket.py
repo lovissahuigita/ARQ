@@ -244,10 +244,10 @@ class rxpsocket:
     def __process_data_xchange(self, _src_ip, _rcvd_segment):
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr:
-            self.__send_buffer.notify_ack(_rcvd_segment.get_ack_num())
+            self.__send_buffer.notify_ack(_rcvd_segment.is_ack_num())
             self.__peer_window_size = _rcvd_segment.get_window_size()
             if self.__is_expecting(_rcvd_segment):
-                if _rcvd_segment.get_cya():
+                if _rcvd_segment.is_cya():
                     self.__increment_next_ack_num()
                     self.__state = States.CLOSE_WAIT
                 else:
@@ -284,9 +284,9 @@ class rxpsocket:
     # use this after listen() is invoked
     def __process_passive_open(self, _src_ip, _rcvd_segment):
         client_queue = self.__connected_client_queue
-        if not client_queue.full() and _rcvd_segment.get_yo():
+        if not client_queue.full() and _rcvd_segment.is_yo():
             src_addr = (_src_ip, _rcvd_segment.get_src_port())
-            if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+            if _rcvd_segment.is_ack() and _rcvd_segment.is_ack_num() == \
                     self.__next_seq_num and src_addr is self.__peer_addr:
                 # Received YO!+ACK segment
                 # PASSIVE OPEN: YO_RCVD->ESTABLISHED
@@ -356,7 +356,7 @@ class rxpsocket:
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr:
             cond = self.__state_cond
-            if _rcvd_segment.get_yo():
+            if _rcvd_segment.is_yo():
                 if self.__state is States.YO_SENT:
                     # ACTIVE OPEN: YO_SENT->SYN_YO_ACK_SENT
                     self.__next_seq_num = random.randint(0, MAX_SEQ_NUM)
@@ -394,7 +394,7 @@ class rxpsocket:
                         stop_func=term_func
                     )
                     self.__increment_next_seq_num()
-            elif _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+            elif _rcvd_segment.is_ack() and _rcvd_segment.is_ack_num() == \
                     self.__next_seq_num and self.__is_expecting(
                 _rcvd_segment) and self.__state is States.SYN_YO_ACK_SENT:
                 # ACTIVE OPEN: SYN_YO_ACK_SENT->ESTABLISHED
@@ -409,7 +409,7 @@ class rxpsocket:
         src_addr = (_src_ip, _rcvd_segment.get_src_port())
         if src_addr is self.__peer_addr and self.__is_expecting(_rcvd_segment):
             # ACK of CYA, there might be a data here as well
-            if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+            if _rcvd_segment.is_ack() and _rcvd_segment.is_ack_num() == \
                     self.__next_seq_num and self.__state is States.CYA_SENT:
                 self.__send_buffer = None
                 cond = self.__state_cond
@@ -418,7 +418,7 @@ class rxpsocket:
                 cond.notify()
                 cond.release()
 
-            if _rcvd_segment.get_cya():
+            if _rcvd_segment.is_cya():
                 # we dont want to accept any more data if CYA bit was set
                 if self.__state is States.CYA_WAIT:
                     self.__state = States.LAST_WAIT
@@ -458,7 +458,7 @@ class rxpsocket:
     def __process_resp_close(self, _src_ip, _rcvd_segment):
         # there should not be any more data here, since the initiator
         # supposed to already close their send buffer
-        if _rcvd_segment.get_ack() and _rcvd_segment.get_ack_num() == \
+        if _rcvd_segment.is_ack() and _rcvd_segment.is_ack_num() == \
                 self.__next_seq_num and self.__is_expecting(_rcvd_segment) \
                 and self.__state is States.LAST_WORD:
             self.__send_buffer = None
