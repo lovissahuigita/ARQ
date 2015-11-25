@@ -19,12 +19,10 @@ class RecvBuffer:
         self.__recv_buffer = collections.deque(maxlen=buffer_size)
         self.__logger.info("Receive Buffer has been created. Size: %d" % self.__recv_buffer.maxlen)
 
-    # return buffer capacity in segment
     def get_buffer_size(self):
         """ Get the size of the buffer
         :return: The size of the buffer
         """
-        self.__logger.info("Get Buffer Size: %d" % min(self.__recv_buffer.maxlen, 2147483647))
         return min(self.__recv_buffer.maxlen, 2147483647)
 
     def set_buffer_size(self, size_in_segment):
@@ -40,13 +38,12 @@ class RecvBuffer:
             maxlen=size_in_segment
         )
         self.__resize_cond.release()
-        self.__logger.info("Buffer Size is: %d" % self.__recv_buffer.maxlen)
+        self.__logger.info("SET Buffer Size is: %d" % self.__recv_buffer.maxlen)
 
     def get_window_size(self):
         """ Returns current window size in segment
         :return: the size of the window
         """
-        self.__logger.info("Window Size: %d" % self.__recv_buffer.maxlen - len(self.__recv_buffer))
         return self.__recv_buffer.maxlen - len(self.__recv_buffer)
 
     def put(self, ack_num, inbound_segment):
@@ -65,6 +62,7 @@ class RecvBuffer:
             ack_num += max(len(inbound_segment.get_data()), 1)
         self.__empty_cond.notify()
         self.__empty_cond.release()
+        self.__logger.info("PUT segment with acknum: %d" % ack_num)
         return ack_num
 
     def take(self, max_read):
@@ -85,5 +83,5 @@ class RecvBuffer:
             front = buffer[0].get_data()
         self.__resize_cond.notify()
         self.__empty_cond.release()
-        self.__logger.info("Data: " + data)
+        self.__logger.info("TAKE data from receive buffer")
         return data
