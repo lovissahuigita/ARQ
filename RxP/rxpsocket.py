@@ -110,7 +110,7 @@ class rxpsocket:
                 # wait will block until predicate is True, ret<-True
                 # else if timeout, ret<-False
                 ret = cond.wait_for(
-                    predicate=self.__state is not States.YO_SENT or
+                    predicate=lambda: self.__state is not States.YO_SENT or
                               term_func.tries == 0,
                     timeout=RTOEstimator.get_rto_interval() / 1000
                 )
@@ -233,6 +233,11 @@ class rxpsocket:
     # For internal use only
     def _get_addr(self):
         return self.__self_addr
+
+        # For internal use only
+
+    def _set_addr(self, addr):
+        self.__self_addr = addr
 
     # Process header for control related information
     # and then pass the segment to buffer to process data related

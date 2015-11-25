@@ -36,7 +36,8 @@ class RxProtocol:
             cls.__udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             cls.__udp_sock.bind(('', udp_port))
             cls.__proxy_addr = proxy_addr
-            threading.Thread(target=cls.__receive()).start()
+            recvthread = threading.Thread(target=cls.__receive)
+            recvthread.start()
 
     @classmethod
     def get_available_port(cls):
@@ -69,11 +70,11 @@ class RxProtocol:
         """
         if not port:
             port = cls.get_available_port()
+            soc._set_addr(('127.0.0.1', port))
         # TODO: who will set the port number field on socket class?
-        if cls.__sockets[addr_port] is None:
+        if cls.__sockets.get(addr_port) is None:
             cls.__sockets[addr_port] = soc
-            if cls.__port_to_addr[
-                port] is None:  # if port is available (which it should be)
+            if cls.__port_to_addr.get(port) is None:  # if port is available (which it should be)
                 cls.__sockets[addr_port] = soc
                 cls.__port_number[addr_port] = port
                 cls.__port_to_addr[port] = addr_port
