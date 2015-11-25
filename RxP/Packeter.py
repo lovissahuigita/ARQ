@@ -7,19 +7,17 @@ __author__ = 'Lovissa Winyoto'
 
 
 class Packeter:
+    __logger = Util.setup_logger()
     MSS = 544  # in bytes
 
-    # breakdown data into packets
-    #  input data is already in binary 
-    # this method breaks the binary to 544 bytes def
     @classmethod
     def packetize(cls, src_port, dst_port, seq_num, data):
-        """
-        Make a new packet
+        """ Breaks down data into packets. The input data is already in binary.
+        This method breaks the binary to 544 bytesdef.
         :param src_port: the source port of the new packet
         :param dst_port: the destination port of the new packet
         :param seq_num: the sequence number of the new packet
-        :param data: the data of the new packet
+        :param data: the data needs to be packetized
         :return: the packets that contain the data
         """
         packet_list = []
@@ -35,10 +33,11 @@ class Packeter:
             # update the index
             start = end + 1
             end += cls.MSS if leftover >= cls.MSS else leftover
+            cls.__logger.info("Packetize: seq_num: %d" % seq_num)
         return packet_list
 
     @classmethod
-    def __carry_around(cls, a, b):  # TODO: is this right?
+    def __carry_around(cls, a, b):
         """
         Make sure that the carry in from a check sum is being added properly
         :param a: the sum
@@ -49,7 +48,7 @@ class Packeter:
         return (c & 0xffff) + (c >> 16)
 
     @classmethod
-    def __checksum(cls, packet):  # TODO: is this right?
+    def __checksum(cls, packet):
         """
         Calculate a packet's checksum.
         The method calculates the checksum by binarizing the packet.
@@ -78,7 +77,6 @@ class Packeter:
         """
         return ~(cls.__checksum(packet)) & 0xffff
 
-    # generate checksum for given data
     @classmethod
     def compute_checksum(cls, packet):
         """
@@ -88,15 +86,14 @@ class Packeter:
         :return: the packet with the checksum filled with the checksum
         """
         packet.set_checksum(0)
-        checksum = cls.__negated_checksum(packet)  # TODO: set this to the right value
+        checksum = cls.__negated_checksum(packet)
         packet.set_checksum(checksum)
+        cls.__logger.info("SET packet checksum: %d" % checksum)
         return packet
 
-    # validate data integrity
     @classmethod
     def validate_checksum(cls, packet):
-        """
-        Returns whether a packet is good based on checksum validation.
+        """ Returns whether a packet is good based on checksum validation.
         The method returns true if the checksum matches (packet is validated)
         The method returns false if the checksum does not match
         :param packet: the packet to be validated
@@ -105,6 +102,7 @@ class Packeter:
         checksum = packet.get_checksum()
         packet.set_checksum(0)
         current_checksum = cls.__checksum(packet)
+        cls.__logger.info("VALIDATE checksum: %s" % str((current_checksum + checksum) & 0xffff == 0))
         return (current_checksum + checksum) & 0xffff == 0
 
     @classmethod
@@ -124,10 +122,13 @@ class Packeter:
         cp = Packet(src_port, dst_port, seq_num, None)
         if yo:
             cp.set_yo()
+            cls.__logger.info("CREATED YO packet")
         if cya:
             cp.set_cya()
+            cls.__logger.info("CREATED CYA packet")
         if ack:
             cp.set_ack(ack_num)
+            cls.__logger.info("CREATED ACK packet")
         return cls.compute_checksum(cp)
 
     @staticmethod
@@ -139,6 +140,8 @@ class Packeter:
         """
         buff = io.BytesIO()
         pickle.dump(segment, buff)
+        loggers = Util.setup_logger()
+        loggers.info("BINARIZE: %s" % str(buff.getvalue()))
         return buff.getvalue()
 
     @staticmethod
@@ -148,6 +151,8 @@ class Packeter:
         :param binary: the binary
         :return: anything
         """
+        loggers = Util.setup_logger()
+        loggers.info("OBJECTIZE: %s" % str(pickle.loads(binary)))
         return pickle.loads(binary)
 
 

@@ -2,12 +2,14 @@ import socket
 import threading
 from random import randint
 from RxP.Packeter import Packeter
+from FxA.util import Util
 from exception import RxPException, NetworkReinitException
 
 __author__ = 'Lovissa Winyoto'
 
 
 class RxProtocol:
+    __logger = Util.setup_logger()
     __sockets = {}  # key: (client_ip_addr, client_port_num) value: socket
     __port_number = {}  # key: (client_ip_addr, client_port_num) value: my
     # port number
@@ -24,8 +26,7 @@ class RxProtocol:
 
     @classmethod
     def open_network(cls, udp_port, proxy_addr):
-        """
-        Opens a UDP socket.
+        """ Opens a UDP socket.
         :param udp_port: the udp port used to send and received
         :param proxy_addr: proxy address
         :return: None
@@ -38,22 +39,23 @@ class RxProtocol:
             cls.__proxy_addr = proxy_addr
             recvthread = threading.Thread(target=cls.__receive)
             recvthread.start()
+        cls.__logger.info("Network Opened")
+
 
     @classmethod
     def get_available_port(cls):
-        """
-        Get a currently available port number
+        """ Get a currently available port number
         :return: the port number
         """
         port = randint(0, 65536)
         while port in cls.__port_to_addr.keys():
             port = randint(0, 65536)
+        cls.__logger.info("GOT available port: %d" % port)
         return port
 
     @classmethod
     def is_available_port(cls, port_num):
-        """
-        Checks whether a port number is available
+        """ Checks whether a port number is available
         :param port_num: the port number to be checked
         :return: True if the port is available, False otherwise
         """
@@ -61,8 +63,7 @@ class RxProtocol:
 
     @classmethod
     def register(cls, soc, port=None, addr_port=(0, 0)):
-        """
-        Register a new socket to the protocol so it knows which are active
+        """Register a new socket to the protocol so it knows which are active
         :param soc: the socket
         :param port: the port of the socket
         :param addr_port: the address of the port of the socket
@@ -71,22 +72,22 @@ class RxProtocol:
         if not port:
             port = cls.get_available_port()
             soc._set_addr(('127.0.0.1', port))
-        # TODO: who will set the port number field on socket class?
         if cls.__sockets.get(addr_port) is None:
             cls.__sockets[addr_port] = soc
-            if cls.__port_to_addr.get(port) is None:  # if port is available (which it should be)
+            # if port is available (which it should be)
+            if cls.__port_to_addr.get(port) is None:
                 cls.__sockets[addr_port] = soc
                 cls.__port_number[addr_port] = port
                 cls.__port_to_addr[port] = addr_port
+                cls.__logger.info("Port number %d is registered" % port)
                 return True
             return False
         else:
-            raise RxPException(105)  # TODO: correct number?
+            raise RxPException(105)
 
     @classmethod
     def deregister(cls, soc):
-        """
-        Delete a socket from the list of active socket
+        """ Delete a socket from the list of active socket
         :param soc: the socket to be deleted/deregistered
         :return: the deleted socket if it exists, None otherwise
         """
@@ -97,19 +98,21 @@ class RxProtocol:
             del cls.__sockets[port_addr]
             del cls.__port_number[port_addr]
             del cls.__port_to_addr[my_port]
+            cls.__logger.info("Socket %s has been unregistered" % soc)
             return deleted
         else:
             return None
 
     @classmethod
     def __receive(cls):
-        """
-        Blocking call to receive from the UDP socket and send it to the socket.
+        """ Blocking call to receive from the UDP socket and send it to the socket.
         Infinite server.
         :return: None
         """
         while True:
+            cls.__logger.info("RxProtocol WAITS to receive")
             received = cls.__udp_sock.recvfrom(cls.BUFF_SIZE)
+            cls.__logger.info("RxProtocol RECEIVED something from %s" % str(received[1]))
             data = Packeter.objectize(received[0])
             addr_port = received[1]
             if addr_port in cls.__sockets.keys():
@@ -120,20 +123,21 @@ class RxProtocol:
 
     @classmethod
     def send(cls, address, packet):
-        """
-        Interface the socket and UDP, to send a packet through the UDP by
+        """ Interface the socket and UDP, to send a packet through the UDP by
         first binarizing the packet
         :param address: the address to send the packet
         :param packet: the packet to be sent
         :return: None
         """
         bin = Packeter.binarize(packet)
+        cls.__logger.info("RxProtocol TRIES to send something")
         cls.__udp_sock.sendto(bin, address)
+        cls.__logger.info("RxProtocol SENT something to %d" % address)
 
     @classmethod
     def ar_send(cls, dest_addr, msg, stop_func=lambda: False):
+        # TODO: Van ini apaan
         """
-
         :param dest_addr: address of the receiver
         :param msg: message to be transmitted
         :param stop_func: function with no param that return True when this
@@ -142,6 +146,7 @@ class RxProtocol:
         """
 
         def dispatcher():
+            # TODO: function inside of a function?
             cls.send(dest_addr, msg)
             while not stop_func():
                 cls.send(dest_addr, msg)
