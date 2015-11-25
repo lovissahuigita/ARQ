@@ -61,7 +61,7 @@ class RxProtocol:
             raise RxPException(105)  # TODO: correct number?
 
     @classmethod
-    def unregister(cls, soc):
+    def deregister(cls, soc):
         port_addr = (soc._get_ip_address, soc._get_port_num)
         if port_addr in cls.__sockets:
             deleted = cls.__sockets[port_addr]

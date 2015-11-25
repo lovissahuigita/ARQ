@@ -447,7 +447,7 @@ class rxpsocket:
             self.__recv_buffer = None
             self.__inbound_processor = lambda src_port, rcvd_segment: None
             self.__state = States.CLOSED
-            RxProtocol.unregister(self)
+            RxProtocol.deregister(self)
 
         self.__schedule_active_closure.scheder = \
             threading.Timer(LAST_WAIT_DUR_S, closure)
@@ -469,7 +469,7 @@ class rxpsocket:
             self.__state = States.CLOSED
             cond.notify()
             cond.release()
-            RxProtocol.unregister(self)
+            RxProtocol.deregister(self)
 
     def __increment_next_seq_num(self):
         self.__next_seq_num = (self.__next_seq_num + 1) % MAX_SEQ_NUM

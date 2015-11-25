@@ -36,13 +36,16 @@ class Packeter:
         return (c & 0xffff) + (c >> 16)
 
     @classmethod
-    def __checksum(cls, message):  # TODO: is this right?
-        """Calculate a data's checksum and make sure that the carry in
-        are added to the result"""
+    def __checksum(cls, packet):  # TODO: is this right?
+        """Calculate a data's checksum by binarizing the packet and make sure
+        that the carry in are added to the result"""
+        bytes = cls.__binarize(packet)
         s = 0
-        for i in range(0, len(message), 2):
-            word = ord(message[i] + ord(message[i + 1]) << 8)
-            s = cls.__carry_around(s, word)
+        ptr = 0
+        while ptr < len(bytes):
+            double_byte = bytes[ptr] | (bytes[ptr + 1] << 8) if ptr + 1 < len(bytes) else 0
+            ptr += 2
+            s = cls.__carry_around(s, double_byte)
         return s
 
     @classmethod
