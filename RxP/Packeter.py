@@ -49,17 +49,18 @@ class Packeter:
         return s
 
     @classmethod
-    def __negated_checksum(cls, message):
+    def __negated_checksum(cls, packet):
         """Negated the checksum result. The method is used when calculating a checksum
         for a packet that will be sent"""
-        return ~(cls.__checksum(message)) & 0xffff
+        return ~(cls.__checksum(packet)) & 0xffff
 
     # generate checksum for given data
     @classmethod
     def compute_checksum(cls, packet):
         """Method to calculate checksum for packets that will be sent.
         The checksum is negated"""
-        checksum = cls.__negated_checksum(packet.get_data())  # TODO: set this to the right value
+        packet.set_checksum(0)
+        checksum = cls.__negated_checksum(packet)  # TODO: set this to the right value
         packet.set_checksum(checksum)
         return packet
 
@@ -71,7 +72,8 @@ class Packeter:
         The method returns false if the checksum does not match
         """
         checksum = packet.get_checksum()
-        current_checksum = cls.__checksum(packet.get_data())
+        packet.set_checksum(0)
+        current_checksum = cls.__checksum(packet)
         return (current_checksum + checksum) & 0xffff == 0
 
     @classmethod
