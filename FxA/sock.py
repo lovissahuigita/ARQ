@@ -1,18 +1,28 @@
 # socket wrapper
 # map tcp socket function call to rxp socket function call
 import socket
+
+from RxP.rxpsocket import rxpsocket
 from exception import RxPException
+
+RXP = True
 
 
 class sock:
     @staticmethod
     def initial_setup(udp_port=int(15000), proxy_addr=('127.0.0.1', int(
         13000))):
-        pass
+        if RXP:
+            rxpsocket.initial_setup(udp_port=udp_port, proxy_addr=proxy_addr)
+        else:
+            pass
 
     def __init__(self):
         try:
-            self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if RXP:
+                self.__s = rxpsocket()
+            else:
+                self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except:
             raise
 

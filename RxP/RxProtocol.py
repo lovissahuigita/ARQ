@@ -1,8 +1,6 @@
 import socket
 import threading
-import thread
 from random import randint
-#import time
 from exception import RxPException, NetworkReinitException
 
 __author__ = 'Lovissa Winyoto'
@@ -32,7 +30,7 @@ class RxProtocol:
             cls.__udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             cls.__udp_sock.bind(('', udp_port))
             cls.__proxy_addr = proxy_addr
-            thread.start_new_thread(cls.__receive, "Thread-Receive")
+            threading.Thread(target=cls.__receive()).start()
 
     @classmethod
     def get_available_port(cls):
@@ -46,7 +44,9 @@ class RxProtocol:
         return port_num in cls.__port_to_addr
 
     @classmethod
-    def register(cls, soc, port=get_available_port(), addr_port=(0, 0)):
+    def register(cls, soc, port=None, addr_port=(0, 0)):
+        if not port:
+            port = cls.get_available_port()
         # TODO: who will set the port number field on socket class?
         if cls.__sockets[addr_port] is None:
             cls.__sockets[addr_port] = soc

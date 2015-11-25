@@ -12,6 +12,11 @@ class SendBuffer:
         # last ack_num rcvd from peer
         self.__last_ackd = 0
 
+
+    def get_last_ackd(self):
+        return self.__last_ackd
+
+
     def notify_ack(self, new_acknum):
         """
         Remove any segment sent successfully from buffer. now the ACK_NUM is what the peer expect next, not what
@@ -60,7 +65,7 @@ class SendBuffer:
         for i in range(0, max_segment):
             prepare = buffer[i]
             prepare.set_ack(ack_num=ack_num)
-            # TODO: how to compute checksum here?
+            Packeter.compute_checksum(prepare)
             segments.append(prepare)
         return segments
 

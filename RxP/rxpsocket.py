@@ -258,6 +258,9 @@ class rxpsocket:
             self.__flush_send()
 
     def __flush_send(self):
+        if self.__flush_send.scheder is not None:
+            self.__flush_send.scheder.cancel()
+
         flow_window = self.__peer_window_size
         congestion_window = 0  # TODO: WE still dont have congestion window
         flushed = self.__send_buffer.take(
@@ -280,6 +283,11 @@ class rxpsocket:
                 address=self.__peer_addr,
                 data=segment
             )
+        self.__flush_send.scheder = threading.Timer(
+            RTOEstimator.get_rto_interval(), self.__flush_send)
+        self.__flush_send.scheder.start()
+
+    __flush_send.scheder = None
 
     # use this after listen() is invoked
     def __process_passive_open(self, _src_ip, _rcvd_segment):
