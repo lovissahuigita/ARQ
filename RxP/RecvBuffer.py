@@ -16,7 +16,7 @@ class RecvBuffer:
 
     # return buffer capacity in segment
     def get_buffer_size(self):
-        return self.__recv_buffer.maxlen
+        return min(self.__recv_buffer.maxlen, 2147483647)
 
     def set_buffer_size(self, size_in_segment):
         self.__resize_cond.acquire()

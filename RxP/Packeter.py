@@ -1,3 +1,6 @@
+import io
+import pickle
+
 from RxP.Packet import Packet
 
 __author__ = 'Lovissa Winyoto'
@@ -79,3 +82,15 @@ class Packeter:
         if ack:
             cp.set_ack(ack_num)
         return cls.compute_checksum(cp)
+
+    @staticmethod
+    def __binarize(segment):
+        buff = io.BytesIO()
+        pickle.dump(segment, buff)
+        return buff.getvalue()
+
+    @staticmethod
+    def __objectize(binary):
+        return pickle.loads(binary)
+
+
