@@ -1,7 +1,4 @@
-# socket wrapper
-# map tcp socket function call to rxp socket function call
 import socket
-
 from RxP.rxpsocket import rxpsocket
 from exception import RxPException
 

@@ -2,8 +2,8 @@ import argparse
 import logging
 import re
 import traceback
-from FxA.sock import sock
-from FxA.util import Util
+from sock import sock
+from util import Util
 from exception import ArgumentCountException, RxPException
 
 __logger = None
