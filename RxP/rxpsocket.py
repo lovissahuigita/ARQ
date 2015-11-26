@@ -138,6 +138,11 @@ class rxpsocket:
                 msg=first_yo,
                 stop_func=term_func,
             )
+            self.__state_cond.acquire()
+            self.__logger.inf
+            self.__state_cond.wait_for(
+                predicate=lambda: self.__state is States.ESTABLISHED
+            )
         elif self.__state is States.CLOSED:
             raise RxPException(errno=103)
         elif self.__state is States.LAST_WAIT:

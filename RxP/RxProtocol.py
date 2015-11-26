@@ -174,7 +174,7 @@ class RxProtocol:
                 dest_socket = cls.__sockets.get(my_port)
             dest_socket._process_rcvd(peer_addr[0], segment)
             cls.__logger.info("RxP RECEIVED:\nsrc: %s\ndata: %s" % (
-            str(peer_addr), str(segment)))
+                str(peer_addr), str(segment)))
 
     @classmethod
     def send(cls, address, packet):
@@ -206,4 +206,5 @@ class RxProtocol:
             cls.send(dest_addr, msg)
             while not stop_func():
                 cls.send(dest_addr, msg)
-            threading.Thread(target=dispatcher).start()
+
+        threading.Thread(target=dispatcher).start()
