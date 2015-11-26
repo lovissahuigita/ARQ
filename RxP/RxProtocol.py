@@ -94,7 +94,7 @@ class RxProtocol:
         if port not in cls.__sockets.keys():
             cls.__sockets[port] = socket
             cls.__logger.info(
-                "Socket %d is registered in port %d" % (socket, port))
+                "Socket %s is registered in port %d" % (socket, port))
             return True
         else:
             cls.__logger.info("Socket %d is NOT registered" % socket)
@@ -116,7 +116,7 @@ class RxProtocol:
                 cls.__addr_port_pairs[socket] = peer_addr
                 cls.__ports[peer_addr] = port
                 cls.__logger.info(
-                    "REGISTERED IP:port %s to socket %d in port %d" % (
+                    "REGISTERED IP:port %s to socket %s in port %d" % (
                         str(peer_addr), socket, port))
                 return True
             else:

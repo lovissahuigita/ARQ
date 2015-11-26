@@ -67,10 +67,10 @@ class rxpsocket:
     def bind(self, address):
         if self.__self_addr is not None:
             raise RxPException(errno=105)
-        if RxProtocol.is_available_port(port_num=address[1]):
+        if RxProtocol.is_available_port(port=address[1]):
             RxProtocol.register(
-                soc=self,
-                port=self.__self_addr[1]
+                socket=self,
+                port=address[1]
             )
             self.__self_addr = address
         else:
@@ -97,7 +97,7 @@ class rxpsocket:
     def connect(self, address):
         if self.__state is States.OPEN:
             if self.__self_addr is None:
-                RxProtocol.register(soc=self, addr_port=address)
+                RxProtocol.register(socket=self)
 
             RxProtocol.register_peer(
                 port=self.__self_addr[1],
