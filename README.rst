@@ -35,11 +35,16 @@ Authors: Yoel Ivan (yivan3@gatech.edu) & Lovissa Winyoto (lwinyoto3@gatech.edu)
 -----------------------------------
 
 - *__init__.py*:
-- *FxA-client.py*:
-- *FxA-server.py*:
-- *NetEmu.py*:
-- *sock.py*:
-- *util.py*:
+
+- *FxA-client.py*: The client module that tries to connect to the server in order to send and receive data with the server.
+
+- *FxA-server.py*: The server module that listens to clients who need to connect in order to send and receive data with the server.
+
+- *NetEmu.py*: Network Emulator that simulates the behavior of the network during data transaction
+
+- *sock.py*: A wrapper class for the socket to be used by the client and server
+
+- *util.py*: A utility class that contains a collection of shared function between classes.
 
 FxA Server
 ----------
