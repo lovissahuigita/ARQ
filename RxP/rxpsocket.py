@@ -61,13 +61,20 @@ class rxpsocket:
         self.__inbound_processor = lambda src_port, rcvd_segment: None
         self.__peer_window_size = None
 
-    # Bind this socket to @address
-    #
-    # @address  address of this socket
     def bind(self, address):
+        """ Bind the socket to address
+        :param address: tuple of IP address and port to bind
+        :return: None
+        """
+
+        # The port has to be empty in order to bind
         if self.__self_addr is not None:
             raise RxPException(errno=105)
+
+        # Find an available port to bind
         if RxProtocol.is_available_port(port=address[1]):
+
+            # Claim the port by registering it
             RxProtocol.register(
                 socket=self,
                 port=address[1]
@@ -76,12 +83,17 @@ class rxpsocket:
         else:
             raise RxPException(errno=100)
 
-    # Listen at this socket for an incoming connection
-    #
-    # @max_num_queued   maximum number of client waiting to be served
     def listen(self, max_num_queued):
+        """ Listen at this socket for an incoming connection
+        :param max_num_queued: the maximum number of client waiting to be
+        served
+        :return: None
+        """
         if self.__state is States.OPEN:
+            # Change the state of the connection
             self.__state = States.LISTEN
+
+            # register the port to be used by the socket
             if self.__self_addr is None:
                 RxProtocol.register(soc=self)
 
