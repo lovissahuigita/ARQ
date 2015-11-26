@@ -139,7 +139,7 @@ class rxpsocket:
                 stop_func=term_func,
             )
             self.__state_cond.acquire()
-            self.__logger.inf
+            self.__logger.info("Starting 4-way handshake procedure...")
             self.__state_cond.wait_for(
                 predicate=lambda: self.__state is States.ESTABLISHED
             )
