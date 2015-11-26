@@ -117,6 +117,87 @@ FxA Client
 *Updated Protocol*
 ==================
 
+**Four-Way Handshake**
+
+- The client sends a YO! segment to the server to initiate contact
+
+- The server responds by sending a YO! segment back to the client, containing a sequence number that will be used during the connection
+
+- The client responds to the server by sending an ACK segment to the server with an acknowledgment number that follows the sequence number sent before. In this stage, the server’s connection is open to the client, and the server is now able to send data to the client
+
+- Finally, the server sends an ACK segment to the client, indicating that the client’s connection is open and that the client is now able to send data to the server. 
+
+**Three-Way Closing Handshake**
+
+- A host send a CYA segment to initiate closing sequence whenever that host have no longer data to send.
+
+- The closing sequence responder then will still continue sending data if any, and the closing sequence initiator will still have to receive the data.
+
+- Once the closing sequence responder has no more data to send, the responder will send a CYA+ACK segment.
+
+- The initiator then send an ACK packet to the the responder. Responder connection is now terminated, any resources allocated for that connection is now freed.
+
+- The initiator will then wait for a period of time, to make sure the ACK sent is received by the responder.
+Once the wait period ends, the initiator connection is then terminated, any resources allocated for that connection is now freed.
+
+**Four-Way Closing Handshake**
+
+The four-way closing handshake behaves similarly to the three-way closing handshake procedure. The only difference presence is when the responder receives a CYA segment, it sends back an ACK segment back to the initiator instead of sending back CYA+ACK to the initiator. The responder will then send a separate CYA segment when it’s done sending segments.
+
+RxP protocol closing handshake supports both three-way or four-way closing handshake depending on the implementation of the socket.
+
+**Multiplexing**
+
+The idea of multiplexing in the RxP algorithm is to tell which socket is receiving which packet. Since RxP is implemented on top of an unreliable protocol, multiplexing is implemented by keeping track each connection’s states throughout all packet transactions. This requires the receiver to store information of the current open packet transactions. RxP socket keeps track of the states of each connection instead of the multiplexor underneath it. The peer does not know the socket in the protocol that is assigned for them to communicate with. Different peers will communicate with the same listener IP address and port. The RxP protocol is the layer below the RxP socket and it is implemented to keep track of the peer’s IP address and port number. From that information, it multiplexes to the assigned socket for each peer to communicate.
+
+**Cumulative ACK**
+
+ACK bit indicate cumulative ACK, Receive Window will contain the number of byte receiver capable to receive. Upon receiving cumulative ACK, sender should send remaining unsent segments starting with sequence number=ACK  number until sequence number=ACK  number+receive window.
+
+**Computing checksum**
+
+- Set all header field with its intended value and put the data (if any) except for the checksum field.
+
+- Set the checksum to 0
+
+- Read the segment 16-bit at a time and compute the sum of it, ignore any overflow bit
+
+- Put the negation of the total sum into the checksum field.
+
+**Verifying segment integrity**
+
+- Store the checksum field in some temporary variable
+
+- Set the checksum field to 0
+
+- Read the packet 16-bit at a time and keep track the sum, ignore any overflow bit
+
+- Sum the result with the stored checksum
+
+- if the result is all 1’s, the packet is very likely to be valid, otherwise the packet must be corrupted
+
+- Put the checksum back to the checksum field
+
+**Check for duplicate segment**
+
+For receiver, check whether there is already a segment in the receive buffer that contains equal sequence number as the received segment. if there is, then the segment is a duplicate
+
+For sender, check whether there is any segment in the send buffer with sequence number equal to received segment’s ACK number that already marked as ACK’d. if there is, then the segment is a duplicate
+
+**Check for missing/out of order packet**
+
+For receiver, check whether sequence number of the received segment is equal to lastCumulativeAckNum, if not equal then the received segment is out of order
+
+For sender, check whether ACK number of the received segment is equal to nextSeqNum, if not equal then the received segment is out of order
+
+**MSS**
+
+The RxP protocol implements pre-determined MSS, which will be MSS=576 bytes - 32 bytes = 544 bytes 
+
+**Congestion Control**
+
+Congestion Control implements the *Old Tahoe* algorithm. This algorithm increase the number of packets sent slowly when there is no congestion in the network, but once it encounters a problem, it drops the number of packets sent multiplicatively to avoid congestion.
+
 *Updated API*
 =============
 ``**rxpsocket()**: rxpsocket``
