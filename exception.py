@@ -2,6 +2,8 @@
 class NoMoreMessage(Exception):
     pass
 
+class InvalidPeerAddress(Exception):
+    pass
 
 class PortNumberInvalid(Exception):
     pass
