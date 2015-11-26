@@ -46,6 +46,9 @@ Authors: Yoel Ivan (yivan3@gatech.edu) & Lovissa Winyoto (lwinyoto3@gatech.edu)
 
 - *util.py*: A utility class that contains a collection of shared function between classes.
 
+*Compiling and Running Client-Server*
+=====================================
+
 FxA Server
 ----------
 
@@ -110,3 +113,85 @@ FxA Client
 + FxA-client terminates gracefully from the FxA-server:
 
     ``> disconnect``
+
+*Updated API*
+=============
+``**rxpsocket()**: rxpsocket``
+------------------------------
+
+``Creates an unconnected RxP socket.``
+
+    ``Parameter	: void``
+
+    ``Return	:``
+        ``rxpsocket a new RxP socket object.``
+
+``**bind(address)**: void``
+---------------------------
+
+``Associates this socket with a port number.``
+    
+    ``Parameter	:``
+        ``address a tuple that contains the IP address and port number to be associated with this socket.``
+        
+    ``Return	: void``
+
+``**connect(address)**: void``
+------------------------------
+
+``Attempts to establish connection to the server.``
+
+    ``Parameter	:``
+        ``address a tuple that contains the IP address and port number.``
+
+    ``Return	: void``
+
+``**listen(maxQueuedConnections)**: void``
+------------------------------------------
+
+``Opens this socket for any incoming connection, with a maximum number of clients waiting to be connected specified in the parameter.``
+
+    ``  Parameter	:``
+        ``maxQueuedConnections the maximum number of clients that can queue to connect to the socket.``
+
+    ``Return	: void``
+
+``**accept()**: (rxpSocket, clientAddr)``
+-----------------------------------------
+
+``Creates a new socket that will further communicate with the client. The call to this method will block when there is no client waiting to be served by the server.``
+
+    ``Parameter	: void``
+    
+    ``Return	:``
+        ``(rxpSocket, clientAddr) a tuple that contains the new socket that is connected to the client and the client address.``
+
+``**send(dataBytes)**: void``
+-----------------------------
+
+``Sends data by putting the data bytes in the socket.``
+
+    ``Parameter	:``
+        ``dataBytes the byte stream to be sent through the socket.``
+
+    ``Return	: void``
+
+``**recv(maxBytesRead)**: dataBytes``
+-------------------------------------
+
+``Returns the data byte array received by the socket. The data byte array contains up to a specified number of bytes. The call to this method will block when there are no data to be read, and will return NONE if the connection terminated unexpectedly.``
+
+    ``Parameter	:``
+        ``maxBytesRead the maximum number of bytes in the data byte array.``
+
+    ``Return	:``
+        ``dataBytes the byte array containing the data received by the socket.``
+
+``**close()**: void``
+---------------------
+
+``Closes the connection of this socket by initiating three-way closing handshake.``
+
+    ``Parameter	: void``
+    
+    ``Return	: void``
