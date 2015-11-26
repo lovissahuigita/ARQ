@@ -22,6 +22,12 @@ class RxProtocol:
     # first hop of every segment sent out of this layer
     __proxy_addr = None
 
+    @classmethod
+    def __debug_state(cls):
+        cls.__logger.debug("__sockets: " + str(cls.__sockets))
+        cls.__logger.debug("__port_number: " + str(cls.__port_number))
+        cls.__logger.debug("__port_to_addr: " + str(cls.__port_to_addr))
+
     BUFF_SIZE = int(2048)
 
     @classmethod
@@ -59,7 +65,7 @@ class RxProtocol:
         :param port_num: the port number to be checked
         :return: True if the port is available, False otherwise
         """
-        return port_num in cls.__port_to_addr
+        return port_num not in cls.__port_to_addr
 
     @classmethod
     def register(cls, soc, port=None, addr_port=(0, 0)):
@@ -115,10 +121,15 @@ class RxProtocol:
             cls.__logger.info("RxProtocol RECEIVED something from %s" % str(received[1]))
             data = Packeter.objectize(received[0])
             addr_port = received[1]
+            cls.__debug_state()
             if addr_port in cls.__sockets.keys():
-                dst_socket = cls.__sockets[addr_port]
+                dst_socket = cls.__sockets.get(addr_port)
             else:
-                dst_socket = cls.__sockets[cls.__port_to_addr[addr_port[1]]]
+                #dst_socket = cls.__sockets.get(
+                #    cls.__port_to_addr.get(addr_port[1]))
+                dst_socket = cls.__sockets.get(addr_port)
+                if not dst_socket:
+                    raise Exception
             dst_socket._process_rcvd(addr_port[0], data)
 
     @classmethod
@@ -129,10 +140,11 @@ class RxProtocol:
         :param packet: the packet to be sent
         :return: None
         """
+        cls.__debug_state()
         bin = Packeter.binarize(packet)
         cls.__logger.info("RxProtocol TRIES to send something")
-        cls.__udp_sock.sendto(bin, address)
-        cls.__logger.info("RxProtocol SENT something to %d" % address)
+        cls.__udp_sock.sendto(bin, cls.__proxy_addr)
+        cls.__logger.info("RxProtocol SENT something to " + str(address))
 
     @classmethod
     def ar_send(cls, dest_addr, msg, stop_func=lambda: False):

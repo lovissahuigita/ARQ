@@ -1,6 +1,7 @@
 import random
 import threading
-from asyncio import Queue
+from queue import Queue
+
 from FxA.util import Util
 from RxP.Packeter import Packeter
 from RxP.RTOEstimator import RTOEstimator
@@ -67,6 +68,10 @@ class rxpsocket:
         if self.__self_addr is not None:
             raise RxPException(errno=105)
         if RxProtocol.is_available_port(port_num=address[1]):
+            RxProtocol.register(
+                soc=self,
+                port=self.__self_addr[1]
+            )
             self.__self_addr = address
         else:
             raise RxPException(errno=100)
@@ -79,9 +84,9 @@ class rxpsocket:
             self.__state = States.LISTEN
             if self.__self_addr is None:
                 RxProtocol.register(soc=self)
-            else:
-                RxProtocol.register(soc=self, port=self.__self_addr[1])
-            self.__connected_client_queue = Queue(maxsize=max_num_queued)
+
+            self.__connected_client_queue = Queue(
+                maxsize=max_num_queued)
             self.__inbound_processor = self.__process_passive_open
         else:
             raise RxPException(108)
@@ -93,12 +98,11 @@ class rxpsocket:
         if self.__state is States.OPEN:
             if self.__self_addr is None:
                 RxProtocol.register(soc=self, addr_port=address)
-            else:
-                RxProtocol.register(
-                    soc=self,
-                    port=self.__self_addr[1],
-                    addr_port=address
-                )
+
+            RxProtocol.register_peer(
+                port=self.__self_addr[1],
+                peer_addr=address
+            )
             self.__state = States.YO_SENT
             cond = self.__state_cond
 
@@ -156,9 +160,6 @@ class rxpsocket:
         # )
         # return res.get()
         childsock = self.__connected_client_queue.get(block=True)
-        RxProtocol.register(
-            soc=childsock
-        )
         return childsock
 
     def send(self, data_bytes):
@@ -313,6 +314,16 @@ class rxpsocket:
                 cond.notify()
                 cond.release()
                 client_queue.put(self.__spawn_kid())
+                RxProtocol.send(
+                    address=src_addr,
+                    packet=Packeter.control_packet(
+                        src_port=self.__self_addr[1],
+                        dst_port=self.__peer_addr[1],
+                        seq_num=self.__next_seq_num,
+                        ack_num=self.__next_ack_num,
+                        ack=True
+                    )
+                )
                 # TODO: what if there are lots of client waiting, and this
                 # listening socket closed?
                 # TODO: let the new created socket send ACK with data
@@ -352,7 +363,6 @@ class rxpsocket:
     def __spawn_kid(self):
         # TODO: make sure this kid initialized with all the right value!!!!!
         kiddy = rxpsocket()
-        kiddy.__self_addr = (self.__self_addr[0], 0)
         kiddy.__state = States.ESTABLISHED
         kiddy.__peer_addr = self.__peer_addr
         kiddy.__next_seq_num = self.__next_seq_num
@@ -362,6 +372,16 @@ class rxpsocket:
         )
         kiddy.__send_buffer = SendBuffer()
         kiddy.__inbound_processor = kiddy.__process_data_xchange
+        RxProtocol.register(
+            soc=kiddy
+        )
+        kiddy.__self_addr = self.__self_addr
+        RxProtocol.register_peer(
+            # after the previous call return, this kiddy socket should have
+            # a port num
+            port=kiddy.__self_addr[1],
+            peer_addr=self.__peer_addr
+        )
         return kiddy
 
     # use this after first Yo! is sent
@@ -397,7 +417,7 @@ class rxpsocket:
                         src_port=self.__self_addr[1],
                         dst_port=src_addr[1],
                         seq_num=self.__next_seq_num,
-                        ack_num=_rcvd_segment.get_seq_num() + 1,
+                        ack_num=self.__next_ack_num,
                         yo=True,
                         ack=True
                     )
@@ -435,6 +455,7 @@ class rxpsocket:
                 # we dont want to accept any more data if CYA bit was set
                 if self.__state is States.CYA_WAIT:
                     self.__state = States.LAST_WAIT
+                    self.__increment_next_ack_num()
                 if self.__state is States.LAST_WAIT:
                     last_ack = Packeter.control_packet(
                         src_port=self.__self_addr[1],
@@ -443,7 +464,6 @@ class rxpsocket:
                         ack_num=self.__next_ack_num,
                         ack=True
                     )
-                    self.__increment_next_seq_num()
                     RxProtocol.send(
                         address=src_addr,
                         data=last_ack

@@ -1,5 +1,4 @@
 class Packet:
-
     def __init__(self, src_port, dst_port, seq_num=0, data=None):
         if not data:
             data = []
@@ -64,19 +63,30 @@ class Packet:
         return self.__ack
 
     def __str__(self):
-        data = None
+        text = None
         if self.is_yo():
-            data = "YO!"
+            text = "YO!"
         elif self.is_cya():
-            data = "CYA!"
+            text = "CYA!"
         else:
-            data = "Data"
+            text = "Data"
         if self.is_ack():
-            if not data:
-                data = "ACK"
+            if not text:
+                text = "ACK"
             else:
-                data += ", ACK"
-        return "Packet Description: \nSource Port          : " + self.__src_port + "\nDestination Port      : "\
-               + self.__dst_port + "\nSequence Number      : " + self.__seq_num + "\nAcknowledgement Number : "\
-               + self.__ack_num + "\nWindow Size          : " + self.__recv_window_size + "\nChecksum           : "\
-               + self.__checksum + "\nType                 : " + data + "\nData          : " + self.__data + "\n"
+                text += ", ACK"
+        to_return = "Packet Description: \nSource Port             : "
+        to_return += str(self.__src_port)
+        to_return += "\nDestination Port       : "
+        to_return += str(self.__dst_port)
+        to_return += "\nSequence Number        : "
+        to_return += str(self.__seq_num)
+        to_return += "\nAcknowledgement Number : "
+        to_return += str(self.__ack_num)
+        to_return += "\nWindow Size            : "
+        to_return += str(self.__checksum)
+        to_return += "\nType                   : "
+        to_return += text
+        to_return += "\nData                : "
+        to_return += str(self.__data)
+        return to_return
