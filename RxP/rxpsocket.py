@@ -133,16 +133,15 @@ class rxpsocket:
                 ack_num=0,
                 yo=True
             )
-            RxProtocol.ar_send(
+            self.__logger.info("Starting 4-way handshake procedure...")
+            worker = RxProtocol.ar_send(
                 dest_addr=address,
                 msg=first_yo,
                 stop_func=term_func,
             )
-            self.__state_cond.acquire()
-            self.__logger.info("Starting 4-way handshake procedure...")
-            self.__state_cond.wait_for(
-                predicate=lambda: self.__state is States.ESTABLISHED
-            )
+            worker.join()
+            if self.__state is not States.ESTABLISHED:
+                raise RxPException(101)
         elif self.__state is States.CLOSED:
             raise RxPException(errno=103)
         elif self.__state is States.LAST_WAIT:
@@ -249,6 +248,7 @@ class rxpsocket:
     # and then pass the segment to buffer to process data related
     # information
     def _process_rcvd(self, src_ip, rcvd_segment):
+        self.__logger.info("Received segment: " + str(rcvd_segment))
         if Packeter.validate_checksum(rcvd_segment):
             self.__inbound_processor(src_ip, rcvd_segment)
 

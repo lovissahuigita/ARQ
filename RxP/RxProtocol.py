@@ -34,8 +34,8 @@ class RxProtocol:
     @classmethod
     def __debug_state(cls):
         cls.__logger.debug("__sockets: " + str(cls.__sockets))
-        cls.__logger.debug("__port_number: " + str(cls.__port_number))
-        cls.__logger.debug("__port_to_addr: " + str(cls.__port_to_addr))
+        cls.__logger.debug("__port_number: " + str(cls.__ports))
+        cls.__logger.debug("__port_to_addr: " + str(cls.__addr_port_pairs))
 
     BUFF_SIZE = int(2048)
 
@@ -207,4 +207,6 @@ class RxProtocol:
             while not stop_func():
                 cls.send(dest_addr, msg)
 
-        threading.Thread(target=dispatcher).start()
+        worker = threading.Thread(target=dispatcher)
+        worker.start()
+        return worker

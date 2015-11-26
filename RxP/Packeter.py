@@ -1,7 +1,6 @@
 from FxA.util import Util
 import io
 import pickle
-
 from RxP.Packet import Packet
 
 __author__ = 'Lovissa Winyoto'
@@ -54,7 +53,8 @@ class Packeter:
         Calculate a packet's checksum.
         The method calculates the checksum by binarizing the packet.
         The binarized packet checksum is zeroed before checksummed.
-        The method calls the __carry_around method to recount the overflow to the checksum
+        The method calls the __carry_around method to recount the overflow
+        to the checksum
         :param packet: the packet to be checksummed
         :return: the checksum of the packet
         """
@@ -62,7 +62,8 @@ class Packeter:
         s = 0
         ptr = 0
         while ptr < len(bytes):
-            double_byte = bytes[ptr] | (bytes[ptr + 1] << 8) if ptr + 1 < len(bytes) else 0
+            double_byte = bytes[ptr] | (bytes[ptr + 1] << 8) if ptr + 1 < len(
+                bytes) else 0
             ptr += 2
             s = cls.__carry_around(s, double_byte)
         return s
@@ -71,7 +72,8 @@ class Packeter:
     def __negated_checksum(cls, packet):
         """
         Calculate the checksum of a packet and negate it.
-        This method calls the cls.__checksum method that calculates the checksum of the packet and negates the return
+        This method calls the cls.__checksum method that calculates the
+        checksum of the packet and negates the return
         value.
         :param packet: the packet that needs the negated checksum
         :return: the negated checksum of the packet
@@ -103,8 +105,14 @@ class Packeter:
         checksum = packet.get_checksum()
         packet.set_checksum(0)
         current_checksum = cls.__checksum(packet)
-        cls.__logger.info("VALIDATE checksum: %s" % str((current_checksum + checksum) & 0xffff == 0))
-        return (current_checksum + checksum) & 0xffff == 0
+        cls.__logger.info("VALIDATE checksum: %s" % str((current_checksum +
+                                                         checksum) & 0xffff
+                                                        == 0xffff))
+        ret = cls.__carry_around(current_checksum, checksum) & 0xffff == 0xffff
+        cls.__logger.info(
+            "checksum %d current checksum %d" % (checksum, current_checksum))
+        packet.set_checksum(checksum)
+        return ret
 
     @classmethod
     def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
@@ -155,6 +163,3 @@ class Packeter:
         loggers = Util.setup_logger()
         loggers.info("OBJECTIZE: %s" % str(pickle.loads(binary)))
         return pickle.loads(binary)
-
-
-
