@@ -114,6 +114,9 @@ FxA Client
 
     ``> disconnect``
 
+*Updated Protocol*
+==================
+
 *Updated API*
 =============
 ``**rxpsocket()**: rxpsocket``
@@ -195,3 +198,6 @@ FxA Client
     ``Parameter	: void``
     
     ``Return	: void``
+
+*Known Bugs and Limitations*
+============================
