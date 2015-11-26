@@ -29,7 +29,7 @@ class Util(object):
 
     @classmethod
     def exit_error(cls, msg):
-        print(cls.ERROR_TAG + msg, file=sys.stderr)
+        # print(cls.ERROR_TAG + msg, file=sys.stderr)
         exit()
 
     @classmethod
