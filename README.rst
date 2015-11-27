@@ -49,6 +49,9 @@ Authors: Yoel Ivan (yivan3@gatech.edu) & Lovissa Winyoto (lwinyoto3@gatech.edu)
 *Compiling and Running Client-Server*
 =====================================
 
+Currently, the protocol can be run using PyCharm. Download the .zip and extract it or clone the protocol from github page.
+Then, enter the parameters (as shown below) for both the client and the server.
+
 FxA Server
 ----------
 
@@ -113,9 +116,12 @@ FxA Client
 + FxA-client terminates gracefully from the FxA-server:
 
     ``> disconnect``
+    
 
 *Updated Protocol*
 ==================
+
+The protocol implements Go-Back-N, which means it drops any out of order packet and request the packet that it is supposed to get using the ack number whenever there is an anomali when receiving a packet.
 
 **Four-Way Handshake**
 
@@ -282,3 +288,16 @@ Congestion Control implements the *Old Tahoe* algorithm. This algorithm increase
 
 *Known Bugs and Limitations*
 ============================
+
+**Bugs**
+
+- The protocol currently cannot receive a large amount of data
+
+- The protocol has a buggy Congestion Control
+
+- The protocol cannot do the closing handshake properly
+
+
+**Limitations**
+
+- Flow control has not been implemented in this protocol
