@@ -12,6 +12,8 @@ class RxProtocol:
     # for debugging purposes
     __logger = Util.setup_logger()
 
+    __send_count = 0
+    __receive_count = 0
     __sockets = {}
     # key	: my port number
     # value : the socket
@@ -31,13 +33,15 @@ class RxProtocol:
     # first hop of every segment sent out of this layer
     __proxy_addr = None
 
+    __dispatch_id = 0
+
     @classmethod
     def __debug_state(cls):
         cls.__logger.debug("__sockets: " + str(cls.__sockets))
         cls.__logger.debug("__port_number: " + str(cls.__ports))
         cls.__logger.debug("__port_to_addr: " + str(cls.__addr_port_pairs))
 
-    BUFF_SIZE = int(2048)
+    BUFF_SIZE = int(32768)
 
     @classmethod
     def open_network(cls, udp_port, proxy_addr):
@@ -161,20 +165,25 @@ class RxProtocol:
             # Receive from UDP
             cls.__logger.info("RxP waits to RECEIVE")
             received = cls.__udp_sock.recvfrom(cls.BUFF_SIZE)
-            cls.__logger.info("RxP receives something...")
-
+            cls.__receive_count += 1
+            cls.__logger.info("RxP RECEIVES")
             # Objectize the segment (packet) and get the source IP:port
             segment = Packeter.objectize(received[0])
-            my_port = (segment.get_dst_port())
-            peer_addr = received[1]
+            my_port = segment.get_dst_port()
+            peer_addr = (received[1][0], segment.get_src_port())
+            cls.__logger.info("RxP receives something of length " + str(len(
+                received[0])) + " from " + str(peer_addr))
 
-            if peer_addr in cls.__sockets.keys():
-                dest_socket = cls.__sockets.get(peer_addr)
+            port = cls.__ports.get(peer_addr)
+            if port in cls.__sockets.keys():
+                dest_socket = cls.__sockets.get(port)
             else:
                 dest_socket = cls.__sockets.get(my_port)
-            dest_socket._process_rcvd(peer_addr[0], segment)
+            if dest_socket:
+                dest_socket._process_rcvd(peer_addr[0], segment)
             cls.__logger.info("RxP RECEIVED:\nsrc: %s\ndata: %s" % (
                 str(peer_addr), str(segment)))
+            cls.print_stats()
 
     @classmethod
     def send(cls, address, packet):
@@ -186,9 +195,13 @@ class RxProtocol:
         """
         cls.__debug_state()
         bin = Packeter.binarize(packet)
-        cls.__logger.info("RxProtocol TRIES to send something")
+        cls.__logger.info(
+            "RxProtocol TRIES to send something with length of " + str(
+                len(bin)) + '\n' + str(packet))
         cls.__udp_sock.sendto(bin, cls.__proxy_addr)
+        cls.__send_count += 1
         cls.__logger.info("RxProtocol SENT something to " + str(address))
+        cls.print_stats()
 
     @classmethod
     def ar_send(cls, dest_addr, msg, stop_func=lambda: False):
@@ -203,10 +216,24 @@ class RxProtocol:
 
         def dispatcher():
             # TODO: function inside of a function?
+            cls.__logger.debug(threading.current_thread().name +
+                               ' start working')
             cls.send(dest_addr, msg)
             while not stop_func():
+                cls.__logger.debug(threading.current_thread().name +
+                                   ' retransmitting..')
                 cls.send(dest_addr, msg)
+            cls.__logger.debug(threading.current_thread().name +
+                               ' retiring')
 
-        worker = threading.Thread(target=dispatcher)
+        worker = threading.Thread(target=dispatcher, name='dispatcher' +
+                                                          str(cls.__dispatch_id))
+        cls.__dispatch_id += 1
         worker.start()
+        cls.__logger.debug("Thread count: " + str(threading.active_count()))
         return worker
+
+    @classmethod
+    def print_stats(cls):
+        cls.__logger.debug("UDP receive count: " + str(cls.__receive_count))
+        cls.__logger.debug("UDP send count: " + str(cls.__send_count))

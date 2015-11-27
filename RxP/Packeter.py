@@ -1,3 +1,5 @@
+import re
+
 from FxA.util import Util
 import io
 import pickle
@@ -8,7 +10,7 @@ __author__ = 'Lovissa Winyoto'
 
 class Packeter:
     __logger = Util.setup_logger()
-    MSS = 544  # in bytes
+    MSS = 1024  # in bytes
 
     @classmethod
     def packetize(cls, src_port, dst_port, seq_num, data):
@@ -21,19 +23,24 @@ class Packeter:
         :return: the packets that contain the data
         """
         packet_list = []
-        leftover = len(data)
-        start = 0
-        end = (cls.MSS if len(data) >= cls.MSS else len(data)) - 1
-        while leftover > 0:
-            seq_num += end
-            new_packet = cls.__compute_checksum(
-                Packet(src_port, dst_port, seq_num, data[start:end]))
+        if data:
+            leftover = len(data)
+            start = 0
+            end = (cls.MSS if len(data) >= cls.MSS else len(data)) - 1
+            while leftover > 0:
+                new_packet = cls.compute_checksum(
+                    Packet(src_port, dst_port, seq_num, data[start:end+1]))
+                packet_list.append(new_packet)
+                seq_num += end
+                leftover -= (end - start + 1)
+                # update the index
+                start = end + 1
+                end += cls.MSS if leftover >= cls.MSS else leftover
+                cls.__logger.info("Packetize: seq_num: %d" % seq_num)
+        else:
+            new_packet = cls.compute_checksum(
+                Packet(src_port, dst_port, seq_num))
             packet_list.append(new_packet)
-            leftover -= (end - start + 1)
-            # update the index
-            start = end + 1
-            end += cls.MSS if leftover >= cls.MSS else leftover
-            cls.__logger.info("Packetize: seq_num: %d" % seq_num)
         return packet_list
 
     @classmethod
@@ -58,6 +65,8 @@ class Packeter:
         :param packet: the packet to be checksummed
         :return: the checksum of the packet
         """
+        orig = packet.get_checksum()
+        packet.set_checksum(0)
         bytes = cls.binarize(packet)
         s = 0
         ptr = 0
@@ -66,6 +75,7 @@ class Packeter:
                 bytes) else 0
             ptr += 2
             s = cls.__carry_around(s, double_byte)
+        packet.set_checksum(orig)
         return s
 
     @classmethod
@@ -88,8 +98,8 @@ class Packeter:
         :param packet: the packet to be checksummed
         :return: the packet with the checksum filled with the checksum
         """
-        packet.set_checksum(0)
-        checksum = cls.__negated_checksum(packet)
+
+        checksum = cls.__checksum(packet)
         packet.set_checksum(checksum)
         cls.__logger.info("SET packet checksum: %d" % checksum)
         return packet
@@ -103,19 +113,18 @@ class Packeter:
         :return: True if the packet is a good packet, False otherwise
         """
         checksum = packet.get_checksum()
-        packet.set_checksum(0)
-        current_checksum = cls.__checksum(packet)
-        cls.__logger.info("VALIDATE checksum: %s" % str((current_checksum +
+        actual_checksum = cls.__checksum(packet)
+        cls.__logger.info(
+            "checksum %d current checksum %d" % (checksum, actual_checksum))
+        cls.__logger.info("VALIDATE checksum: %s" % str((actual_checksum +
                                                          checksum) & 0xffff
                                                         == 0xffff))
-        ret = cls.__carry_around(current_checksum, checksum) & 0xffff == 0xffff
-        cls.__logger.info(
-            "checksum %d current checksum %d" % (checksum, current_checksum))
-        packet.set_checksum(checksum)
-        return ret
+        ret = cls.__carry_around(actual_checksum, checksum) & 0xffff == 0xffff
+        assert checksum == packet.get_checksum()
+        return checksum == actual_checksum
 
     @classmethod
-    def control_packet(cls, src_port, dst_port, seq_num, ack_num, yo=False,
+    def control_packet(cls, src_port, dst_port, seq_num, ack_num=0, yo=False,
                        cya=False, ack=False):
         """
         Make a control packet
@@ -140,26 +149,73 @@ class Packeter:
             cls.__logger.info("CREATED ACK packet")
         return cls.compute_checksum(cp)
 
-    @staticmethod
-    def binarize(segment):
+    @classmethod
+    def binarize(cls, segment):
         """
         Convert anything to binary
         :param segment: anything
         :return: binarized anything
         """
-        buff = io.BytesIO()
-        pickle.dump(segment, buff)
-        loggers = Util.setup_logger()
-        loggers.info("BINARIZE: %s" % str(buff.getvalue()))
-        return buff.getvalue()
+        return segment._stringify().encode('utf-8') #buff.getvalue()
 
-    @staticmethod
-    def objectize(binary):
+    @classmethod
+    def objectize(cls, binary):
         """
         Converts binary to anything
         :param binary: the binary
         :return: anything
         """
-        loggers = Util.setup_logger()
-        loggers.info("OBJECTIZE: %s" % str(pickle.loads(binary)))
-        return pickle.loads(binary)
+        # loggers = cls.__logger
+        # loggers.info("OBJECTIZE: %d %s" % (len(binary), binary))
+        # ret = pickle.loads(binary)
+        # loggers.debug(ret)
+        return cls._objectify(binary) #ret
+
+    @classmethod
+    def __print_bin(cls, bin):
+
+        cls.__logger.debug(str(len(bin)))
+        a = []
+        for byte in bin:
+            a.append("0x{:02x}".format(byte))
+        return ''#a
+
+    @classmethod
+    def _objectify(cls, packet):
+        cls.__logger.info("OBJECTIFY")
+        res = re.match('<src>(.+?)</src><dst>(.+?)</dst><seq>('
+                       '.+?)</seq><ack>(.+?)</ack><wind>(.+?)</wind><chk>('
+                       '.+?)</chk><cyo>(.+?)</cyo><ccya>(.+?)</ccya><cack>('
+                       '.+?)</cack><data>(.+?)</data>', packet.decode('utf-8'))
+        if not res:
+            cls.__logger.info("corrupted object")
+            return Packet()
+        cls.__logger.debug(res.group(0))
+        datalist = res.group(10)
+        i = int(0)
+        done = False
+        data = []
+        while not done:
+            datares = re.search('<' + str(i) + '>(.+?)</' + str(i) + '>',
+                             datalist)
+            if datares:
+                data.append(int(datares.group(1)))
+            else:
+                done = True
+            i += 1
+
+        pack = Packet()
+        pack._copy(
+            src=int(res.group(1)),
+            dst=int(res.group(2)),
+            seq=int(res.group(3)),
+            ack=int(res.group(4)),
+            wind=int(res.group(5)),
+            chk=int(res.group(6)),
+            cyo=True if res.group(7) == 'True' else False,
+            ccya=True if res.group(8) == 'True' else False,
+            cack=True if res.group(9) == 'True' else False,
+            data=data
+        )
+        cls.__logger.info("OBJ done")
+        return pack

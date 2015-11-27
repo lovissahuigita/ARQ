@@ -1,7 +1,12 @@
 class Packet:
-    def __init__(self, src_port, dst_port, seq_num=0, data=None):
+
+    def __init__(self, src_port=0, dst_port=0, seq_num=0, data=None):
         if not data:
             data = []
+        elif type(data) is not type([]):
+            data = list(data)
+
+
         self.__src_port = src_port
         self.__dst_port = dst_port
         self.__seq_num = seq_num
@@ -15,6 +20,42 @@ class Packet:
         self.__ack = False
 
         self.__data = data
+
+    def _copy(self, src, dst, seq, ack, wind, chk, cyo, ccya, cack, data):
+        if not data:
+            data = []
+        self.__src_port = src
+        self.__dst_port = dst
+        self.__seq_num = seq
+        self.__ack_num = ack
+
+        self.__recv_window_size = wind
+        self.__checksum = chk
+
+        self.__yo = cyo
+        self.__cya = ccya
+        self.__ack = cack
+
+        self.__data = data
+
+    def _stringify(self):
+        st = ''
+        st += '<src>' + str(self.__src_port) + '</src>'
+        st += '<dst>' + str(self.__dst_port) + '</dst>'
+        st += '<seq>' + str(self.__seq_num) + '</seq>'
+        st += '<ack>' + str(self.__ack_num) + '</ack>'
+        st += '<wind>' + str(self.__recv_window_size) + '</wind>'
+        st += '<chk>' + str(self.__checksum) + '</chk>'
+        st += '<cyo>' + str(self.__yo) + '</cyo>'
+        st += '<ccya>' + str(self.__cya) + '</ccya>'
+        st += '<cack>' + str(self.__ack) + '</cack>'
+        st += '<data>' + str(self.__data)
+        i = int(0)
+        for data in self.__data:
+            st += '<' + str(i) + '>' + str(data) + '</' + str(i) + '>'
+            i += 1
+        st += '</data>'
+        return st
 
     def get_data(self):
         return self.__data
@@ -83,10 +124,12 @@ class Packet:
         to_return += str(self.__seq_num)
         to_return += "\nAcknowledgement Number : "
         to_return += str(self.__ack_num)
-        to_return += "\nWindow Size            : "
+        to_return += "\n Window Size            : "
+        to_return += str(self.__recv_window_size)
+        to_return += "\n Checksum               : "
         to_return += str(self.__checksum)
-        to_return += "\nType                   : "
+        to_return += "\nType                    : "
         to_return += text
-        to_return += "\nData                : "
+        to_return += "\nData                    : "
         to_return += str(self.__data)
         return to_return

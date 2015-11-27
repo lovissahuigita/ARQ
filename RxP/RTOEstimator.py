@@ -1,6 +1,6 @@
 
 class RTOEstimator:
-    __rto           = 1000  #TODO: change this
+    __rto           = 10 #TODO: change this
     __estimated_rtt = 0
     __dev_rtt = 0
 

@@ -87,7 +87,7 @@ class Util(object):
         bytetotalsent = int(0)
 
         while bytetotalsent < filesize:
-            dataread = filehandle.read(1024)
+            dataread = filehandle.read(10240)
             bytesent = int(0)
             byteread = len(dataread)
             cls.__util_logger.debug('read ' + str(byteread) + ' bytes')
@@ -123,7 +123,7 @@ class Util(object):
         bytetotalwritten = int(0)
 
         while bytetotalwritten < filesize:
-            datarcvd = socket.recv(4096)
+            datarcvd = socket.recv(10240)
             bytewritten = int(0)
             bytercvd = len(datarcvd)
             cls.__util_logger.debug('received ' + str(bytercvd) + ' bytes')
